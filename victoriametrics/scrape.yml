@@ -1,0 +1,30 @@
+# Конфиг скрейпинга для VictoriaMetrics (single-node умеет сам скрейпить,
+# отдельный vmagent не нужен — см. флаг --promscrape.config).
+#
+# Скрейпим /metrics у backend и recommendations — это ровно те RED-метрики
+# (http_requests_total, http_request_duration_seconds), которые разбираются
+# в приложении, плюс встроенные go_* / process_* метрики рантайма (аналог USE
+# для отдельного процесса: память, горутины, GC).
+
+global:
+  scrape_interval: 5s
+  scrape_timeout: 4s
+
+scrape_configs:
+  - job_name: backend
+    static_configs:
+      - targets: ["backend:8081"]
+        labels:
+          service: backend
+
+  - job_name: recommendations
+    static_configs:
+      - targets: ["recommendations:8082"]
+        labels:
+          service: recommendations
+
+  - job_name: payment
+    static_configs:
+      - targets: ["payment:8083"]
+        labels:
+          service: payment

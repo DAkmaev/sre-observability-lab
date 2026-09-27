@@ -1,0 +1,57 @@
+# Vector — централизованный сборщик логов
+# (Log Aggregation): читает stdout всех контейнеров через Docker socket,
+# парсит JSON (backend/recommendations/gateway пишут структурированные
+# JSON-логи), и отправляет всё в VictoriaLogs.
+#
+# Без Vector логи каждого контейнера были бы видны только через
+# `docker compose logs <service>` по отдельности — бесполезно, когда
+# сервисов много, особенно в геораспределённой системе.
+
+sources:
+  docker_logs:
+    type: docker_logs
+    include_containers:
+      - sre-backend
+      - sre-recommendations
+      - sre-payment
+      - sre-gateway
+      - sre-frontend
+
+transforms:
+  # Контейнеры пишут либо чистый JSON (backend/recommendations/payment/gateway),
+  # либо обычный текст (frontend/nginx access не в JSON) — пробуем
+  # распарсить как JSON, а если не получилось, оставляем как есть в поле message.
+  parsed:
+    type: remap
+    inputs:
+      - docker_logs
+    source: |
+      parsed, err = parse_json(.message)
+      if err == null {
+        . = merge(., object(parsed) ?? {})
+        # У Go-сервисов человекочитаемое сообщение лежит в поле "msg"
+        # (так его называет стандартный slog.JSONHandler) — копируем
+        # его в "message", чтобы у VictoriaLogs было единое поле для
+        # полнотекстового поиска независимо от источника лога.
+        if exists(.msg) {
+          .message = .msg
+        }
+      }
+      .container = .container_name
+      .stream = "docker"
+
+sinks:
+  victorialogs:
+    type: elasticsearch
+    inputs:
+      - parsed
+    endpoints:
+      - "http://victorialogs:9428/insert/elasticsearch/"
+    mode: bulk
+    api_version: v8
+    healthcheck:
+      enabled: false
+    query:
+      _msg_field: "message"
+      _time_field: "timestamp"
+      _stream_fields: "service,container"

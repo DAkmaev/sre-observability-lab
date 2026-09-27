@@ -1,0 +1,40 @@
+apiVersion: 1
+
+datasources:
+  - name: VictoriaMetrics
+    uid: vm-metrics
+    type: victoriametrics-metrics-datasource
+    access: proxy
+    url: http://victoriametrics:8428
+    isDefault: true
+
+  - name: VictoriaLogs
+    uid: vm-logs
+    type: victoriametrics-logs-datasource
+    access: proxy
+    url: http://victorialogs:9428
+    jsonData:
+      multitenancyHeaders: {}
+
+  - name: Tempo
+    uid: tempo
+    type: tempo
+    access: proxy
+    url: http://tempo:3200
+    jsonData:
+      # Клик по span'у в трейсе → сразу открывает связанные логи в
+      # VictoriaLogs, отфильтрованные по тому же trace_id. Это и есть
+      # связанные метрики, логи и трейсы.
+      tracesToLogsV2:
+        datasourceUid: vm-logs
+        spanStartTimeShift: "-5m"
+        spanEndTimeShift: "5m"
+        filterByTraceID: true
+        customQuery: true
+        query: 'trace_id:"${__trace.traceId}"'
+      tracesToMetrics:
+        datasourceUid: vm-metrics
+      serviceMap:
+        datasourceUid: vm-metrics
+      nodeGraph:
+        enabled: true
