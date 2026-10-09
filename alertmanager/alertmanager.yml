@@ -1,0 +1,34 @@
+# Alertmanager: приём алертов от vmalert, дедупликация, группировка,
+# маршрутизация и отправка уведомлений в каналы оповещения.
+#
+# Для локального стенда приёмником уведомлений выступает крошечный
+# HTTP-сервис alertreceiver (python), который печатает каждое уведомление
+# в stdout контейнера — а его уже подбирает Vector и шлёт в VictoriaLogs.
+# Так студенты видят весь путь алерта без привязки к внешним сервисам
+# (Slack/Telegram/email). Замените url на реальный webhook — и готово.
+
+global:
+  resolve_timeout: 5m
+
+route:
+  # Группируем по имени алерта и сервису, чтобы не спамить одним инцидентом.
+  group_by: ["alertname", "service"]
+  group_wait: 10s
+  group_interval: 30s
+  repeat_interval: 2m
+  receiver: "lab-webhook"
+
+receivers:
+  - name: "lab-webhook"
+    webhook_configs:
+      - url: "http://alertreceiver:9119/alert"
+        send_resolved: true
+
+inhibit_rules:
+  # Погасить менее конкретные алерты, если уже горит более серьёзный
+  # (например, не нужно 10 алертов, когда сервис целиком недоступен).
+  - source_matchers:
+      - service =~ "recommendations|payment"
+    target_matchers:
+      - availability =~ "High|Critical"
+    equal: ["service"]

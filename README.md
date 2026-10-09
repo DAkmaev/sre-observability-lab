@@ -35,6 +35,9 @@ flowchart TB
 | 8 | `tempo` | Хранилище трейсов (OTLP) | `3200`, `4317/4318` |
 | 9 | `victorialogs` | Хранилище логов | `9428` |
 | 10 | `gateway` | nginx, единая точка входа + X-Request-ID | `8080` |
+| 11 | `vmalert` | Выполняет алерты по метрикам, шлёт в Alertmanager | `8880` |
+| 12 | `alertmanager` | Дедупликация и маршрутизация уведомлений | `9093` |
+| — | `alertreceiver` | Печатает уведомления Alertmanager в stdout (для стенда) | — |
 | — | `vector` | Собирает stdout контейнеров → VictoriaLogs | — |
 
 ## Запуск
@@ -52,6 +55,8 @@ docker compose ps        # все сервисы должны быть healthy/r
 - **Витрина**: http://localhost:8080
 - **Grafana**: http://localhost:3000 (admin/admin, но анонимный доступ тоже включён)
 - **VictoriaMetrics UI** (vmui, /targets): http://localhost:8428
+- **vmalert UI** (статус правил и алертов): http://localhost:8880
+- **Alertmanager UI** (активные алерты): http://localhost:9093
 - **VictoriaLogs UI**: http://localhost:9428
 - **Tempo** (обычно смотрят через Grafana, не напрямую): http://localhost:3200
 
@@ -133,6 +138,79 @@ http://localhost:8080/admin/. Панель предназначена тольк
   События: `review_created`, `review_failed`. Операции: `reviews.post`,
   `reviews.list`.
 
+## Алертинг
+
+Стенд включает полноценный путь алертов и показывает, как связаны метрики,
+алерты и уведомления:
+
+```
+VictoriaMetrics  ──(скрейп)──▶  метрики
+      ▲
+      │ PromQL
+   vmalert  ─(firing)─▶  Alertmanager  ─(webhook)─▶  alertreceiver ──▶  stdout → Vector → VictoriaLogs
+```
+
+- **vmalert** каждые `5s` (по умолчанию) выполняет правила из
+  `vmalert/alerts.yml` против VictoriaMetrics. Если выражение вернуло непустой
+  результат дольше `for`, алерт переходит в `firing` и уходит в Alertmanager.
+  Статус правил и активных алертов смотрите на http://localhost:8880
+  (там же `/api/v1/rules` отдают состояние в JSON для автоматизации).
+- **Alertmanager** группирует и дедуплицирует алерты, а затем отправляет
+  уведомления в приёмник. UI активных алертов — http://localhost:9093.
+- **alertreceiver** — Go-сервис, webhook-приёмник уведомлений, который печатает
+  каждое уведомление в stdout (JSON через slog). Его подбирает Vector и
+  отправляет в VictoriaLogs, поэтому **уведомления об алертах видны в логах**
+  так же, как обычные логи сервисов (через Grafana → Explore → VictoriaLogs,
+  `source:"alertreceiver"`, по полю `msg="alert_notification"`). Есть
+  `/healthz` и метрика `up{job="alertreceiver"}`.
+
+### Как проверить алерты
+
+Выполните `docker compose up --build -d`, дождитесь готовности, затем сломайте
+один из сервисов:
+
+```bash
+docker compose stop recommendations
+```
+
+Через ~30 секунд в vmalert (http://localhost:8880) появится `pending`, затем
+`firing` для алерта `TargetDown` (severity `critical`); в Alertmanager
+(http://localhost:9093) уведомление уйдёт в `alertreceiver` и будет видно в
+логах. Верните сервис и убедитесь, что алерт `resolved`:
+
+```bash
+docker compose start recommendations
+```
+
+Другие примеры для демонстрации:
+
+- **Circuit breaker / retry / bulkhead** — включите сбои у `recommendations`
+  или `payment` через админ-панель (http://localhost:8080/admin/) и
+  подождите алертов `CircuitBreakerOpen`, `RetriesExhausted`,
+  `ManyBulkheadRejections`.
+- **Доля ошибок / задержка** — задайте у `recommendations`/`payment`
+  высокие `CHAOS_FAIL_RATE` или `CHAOS_LATENCY_MS` в `docker-compose.yml` и
+  перезапустите. Загорится `HighErrorRatePayment`, `HighErrorRateRecommendations`
+  и `HighLatencyBackend`.
+- **Бизнес-метрики** — раскупите весь склад, чтобы сработал
+  `LowStockProducts`/`HighOutOfStockRate`.
+
+### Правила алертов
+
+`vmalert/alerts.yml` содержит готовые примеры, сгруппированные по смыслу:
+
+| Группа | Пример алерта | Что отслеживает |
+|---|---|---|
+| `availability` | `TargetDown`, `BackendScrapeFailing` | `up == 0`, недоступность целей |
+| `red-errors` | `HighErrorRate` | Доля не-2xx ответов за 5 минут |
+| `red-duration` | `HighLatencyBackend` | p95 задержки ответа |
+| `resilience` | `CircuitBreakerOpen`, `RetriesExhausted`, `ManyBulkheadRejections` | Паттерны отказоустойчивости |
+| `business` | `LowStockProducts`, `HighOutOfStockRate` | Бизнес-метрики стенда |
+| `rate-limiting` | `RecommendationsRateLimited` | Отказы rate limiter'а |
+
+Чтобы отправить алерты в реальный канал (Slack/Telegram/email), замените
+`url` в `receivers` в `alertmanager/alertmanager.yml` на свой webhook.
+
 ## Структура репозитория
 
 ```
@@ -143,6 +221,9 @@ recommendations/            Go, "хрупкая" зависимость с /admi
 payment/                    Go, "хрупкая" зависимость с /admin/chaos (оплата заказа)
 db/init.sql                 схема + seed-данные: products, orders, order_items, payments, users, reviews, stock_movements
 victoriametrics/            scrape.yml — конфиг скрейпинга
+vmalert/                    alerts.yml — правила алертов (PromQL)
+alertmanager/               alertmanager.yml — группировка и маршрутизация уведомлений
+alertreceiver/              Go webhook-приёмник, печатает уведомления в stdout
 tempo/                      tempo.yaml — конфиг хранилища трейсов
 vector/                     vector.yaml — сборщик логов → VictoriaLogs
 grafana/                    provisioning датасорсов + готовый дашборд

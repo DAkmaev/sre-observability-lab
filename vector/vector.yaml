@@ -16,6 +16,7 @@ sources:
       - sre-payment
       - sre-gateway
       - sre-frontend
+      - sre-alertreceiver
 
 transforms:
   # Контейнеры пишут либо чистый JSON (backend/recommendations/payment/gateway),

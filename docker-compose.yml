@@ -123,6 +123,51 @@ services:
       - "8428:8428"   # UI/API VictoriaMetrics (vmui, /targets)
     networks: [sre-lab]
 
+  # ── 6b. vmalert: выполняет алерты по метрикам против VictoriaMetrics ──
+  vmalert:
+    image: victoriametrics/vmalert:latest
+    container_name: sre-vmalert
+    command:
+      - "-rule=/etc/vmalert/alerts.yml"
+      - "-datasource.url=http://victoriametrics:8428"
+      - "-notifier.url=http://alertmanager:9093"
+      - "-httpListenAddr=:8880"
+    volumes:
+      - ./vmalert/alerts.yml:/etc/vmalert/alerts.yml:ro
+    ports:
+      - "8880:8880"   # UI vmalert (+ /api/v1/rules, /-/rules)
+    depends_on:
+      - victoriametrics
+      - alertmanager
+    networks: [sre-lab]
+
+  # ── 6c. Alertmanager: дедупликация/маршрутизация уведомлений ────────
+  alertmanager:
+    image: prom/alertmanager:latest
+    container_name: sre-alertmanager
+    command:
+      - "--config.file=/etc/alertmanager/alertmanager.yml"
+      - "--storage.path=/data"
+      - "--web.listen-address=:9093"
+    volumes:
+      - ./alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - amdata:/data
+    ports:
+      - "9093:9093"   # UI/API Alertmanager
+    depends_on:
+      - alertreceiver
+    networks: [sre-lab]
+
+  # ── 6d. alertreceiver: печатает уведомления в stdout (для стенда) ────
+  alertreceiver:
+    build:
+      context: ./alertreceiver
+    container_name: sre-alertreceiver
+    environment:
+      SERVICE_NAME: alertreceiver
+      HTTP_ADDR: ":9119"
+    networks: [sre-lab]
+
   # ── 8. VictoriaLogs (хранилище логов) ────────────────────────────────
   victorialogs:
     image: victoriametrics/victoria-logs:latest
@@ -195,3 +240,4 @@ volumes:
   vldata:
   tempodata:
   grafanadata:
+  amdata:
