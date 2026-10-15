@@ -145,6 +145,7 @@ services:
   alertmanager:
     image: prom/alertmanager:latest
     container_name: sre-alertmanager
+    user: "0:0"
     command:
       - "--config.file=/etc/alertmanager/alertmanager.yml"
       - "--storage.path=/data"
