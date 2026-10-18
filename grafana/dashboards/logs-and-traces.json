@@ -325,16 +325,12 @@
     {
       "id": 1202,
       "title": "Как пользоваться этим дашбордом",
-      "type": "markdown",
+      "type": "text",
       "gridPos": { "h": 6, "w": 24, "x": 0, "y": 41 },
       "options": {
-        "editorMode": "code",
-        "code": {
-          "language": "plaintext",
-          "showLineNumbers": false,
-          "showMiniMap": false
-        },
-        "markdown": "### Связываем метрики, логи и трейсы\n\n1. **Метрика → трейс**: увидишь рост `Latency p95` или `error rate` на панели сверху → открой **Explore → Tempo**, выбери сервис и время — найдёшь конкретные спаны.\n2. **Трейс → лог**: в открытом трейсе кликни по спаму `backend` → Grafana откроет **VictoriaLogs** с фильтром `trace_id:\"<id>\"` (настроено в datasource Tempo через *tracesToLogs*).\n3. **Лог → трейс**: в логе backend есть `trace_id` — из него можно провалиться обратно в трейс в Tempo.\n4. **Панель Log volume по сервисам** и **Volume ошибок/предупреждений** — это столбчатые графики числа строк во времени (LogsQL-агрегация VictoriaLogs): HTTP-ошибки пишутся на уровне `ERROR`, а причины (`recommendations degraded`, `chaos_injected_failure`, `checkout_failed`) — на `WARN`. При CB OPEN / падении зависимости объём резко растёт — корневую причину видно в тексте панели **Errors & warnings**, а не только в графике метрик."
+        "mode": "markdown",
+        "content": "### Связываем метрики, логи и трейсы\n\n1. **Метрика → трейс**: увидишь рост `Latency p95` или `error rate` на панели сверху → открой **Explore → Tempo**, выбери сервис и время — найдёшь конкретные спаны.\n2. **Трейс → лог**: в открытом трейсе кликни по спаму `backend` → Grafana откроет **VictoriaLogs** с фильтром `trace_id:\"<id>\"` (настроено в datasource Tempo через *tracesToLogs*).\n3. **Лог → трейс**: в логе backend есть `trace_id` — из него можно провалиться обратно в трейс в Tempo.\n4. **Панель Log volume по сервисам** и **Volume ошибок/предупреждений** — это столбчатые графики числа строк во времени (LogsQL-агрегация VictoriaLogs): HTTP-ошибки пишутся на уровне `ERROR`, а причины (`recommendations degraded`, `chaos_injected_failure`, `checkout_failed`) — на `WARN`. При CB OPEN / падении зависимости объём резко растёт — корневую причину видно в тексте панели **Errors & warnings**, а не только в графике метрик.",
+        "editorMode": "code"
       }
     }
   ]
