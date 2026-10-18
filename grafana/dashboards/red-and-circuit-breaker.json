@@ -462,6 +462,65 @@
       }
     },
     {
+      "id": 25,
+      "title": "Recommendations — Duration heatmap",
+      "description": "Распределение длительностей ответов recommendations по времени. Следите, как при CB OPEN советов нет вовсе (пустой heatmap), а в degraded/перегруженном режиме длительности уползают вправо.",
+      "type": "heatmap",
+      "datasource": {
+        "type": "victoriametrics-metrics-datasource",
+        "uid": "vm-metrics"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 35
+      },
+      "targets": [
+        {
+          "expr": "sort_by_label_numeric(sum(rate(recommendations_http_request_duration_seconds_bucket[5m])) by (le), \"le\")",
+          "legendFormat": "le {{le}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": {}
+        },
+        "overrides": []
+      },
+      "options": {
+        "calculate": false,
+        "color": {
+          "mode": "scheme",
+          "scheme": "Oranges",
+          "steps": 64
+        },
+        "cellGap": 1,
+        "yAxis": {
+          "axisPlacement": "left",
+          "min": 0,
+          "max": 10,
+          "reverse": false,
+          "unit": "s"
+        },
+        "xAxis": {
+          "axisPlacement": "top",
+          "show": true
+        },
+        "legend": {
+          "show": true,
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "show": true,
+          "yHistogram": true
+        }
+      }
+    },
+    {
       "id": 120,
       "title": "🧾 Backend / Checkout (RED)",
       "type": "row",
@@ -470,7 +529,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 35
+        "y": 43
       },
       "panels": []
     },
@@ -486,7 +545,7 @@
         "h": 8,
         "w": 8,
         "x": 0,
-        "y": 36
+        "y": 44
       },
       "targets": [
         {
@@ -513,7 +572,7 @@
         "h": 8,
         "w": 8,
         "x": 8,
-        "y": 36
+        "y": 44
       },
       "targets": [
         {
@@ -540,7 +599,7 @@
         "h": 8,
         "w": 8,
         "x": 16,
-        "y": 36
+        "y": 44
       },
       "targets": [
         {
@@ -568,7 +627,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 44
+        "y": 52
       },
       "targets": [
         {
@@ -595,7 +654,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 44
+        "y": 52
       },
       "targets": [
         {
@@ -611,6 +670,65 @@
       }
     },
     {
+      "id": 26,
+      "title": "Backend — Duration heatmap (по route)",
+      "description": "Распределение длительностей ответов backend (все routes). Хвост вправо = медленные зависимости (recommendations при CLOSED/HALF-OPEN, payment и т.д.).",
+      "type": "heatmap",
+      "datasource": {
+        "type": "victoriametrics-metrics-datasource",
+        "uid": "vm-metrics"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 60
+      },
+      "targets": [
+        {
+          "expr": "sort_by_label_numeric(sum(rate(backend_http_request_duration_seconds_bucket[5m])) by (le), \"le\")",
+          "legendFormat": "le {{le}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": {}
+        },
+        "overrides": []
+      },
+      "options": {
+        "calculate": false,
+        "color": {
+          "mode": "scheme",
+          "scheme": "Oranges",
+          "steps": 64
+        },
+        "cellGap": 1,
+        "yAxis": {
+          "axisPlacement": "left",
+          "min": 0,
+          "max": 10,
+          "reverse": false,
+          "unit": "s"
+        },
+        "xAxis": {
+          "axisPlacement": "top",
+          "show": true
+        },
+        "legend": {
+          "show": true,
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "show": true,
+          "yHistogram": true
+        }
+      }
+    },
+    {
       "id": 130,
       "title": "💳 Payment service (RED) + Circuit Breaker",
       "type": "row",
@@ -619,7 +737,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 52
+        "y": 68
       },
       "panels": []
     },
@@ -636,7 +754,7 @@
         "h": 8,
         "w": 6,
         "x": 0,
-        "y": 53
+        "y": 69
       },
       "targets": [
         {
@@ -705,7 +823,7 @@
         "h": 8,
         "w": 9,
         "x": 6,
-        "y": 53
+        "y": 69
       },
       "targets": [
         {
@@ -732,7 +850,7 @@
         "h": 8,
         "w": 9,
         "x": 15,
-        "y": 53
+        "y": 69
       },
       "targets": [
         {
@@ -748,6 +866,65 @@
       }
     },
     {
+      "id": 27,
+      "title": "Payment — Duration heatmap",
+      "description": "Распределение длительностей ответов payment. Если payment деградирует, виден медленный хвост; краткие выбросы = первая попытка + retry.",
+      "type": "heatmap",
+      "datasource": {
+        "type": "victoriametrics-metrics-datasource",
+        "uid": "vm-metrics"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 77
+      },
+      "targets": [
+        {
+          "expr": "sort_by_label_numeric(sum(rate(payment_http_request_duration_seconds_bucket[5m])) by (le), \"le\")",
+          "legendFormat": "le {{le}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": {}
+        },
+        "overrides": []
+      },
+      "options": {
+        "calculate": false,
+        "color": {
+          "mode": "scheme",
+          "scheme": "Oranges",
+          "steps": 64
+        },
+        "cellGap": 1,
+        "yAxis": {
+          "axisPlacement": "left",
+          "min": 0,
+          "max": 10,
+          "reverse": false,
+          "unit": "s"
+        },
+        "xAxis": {
+          "axisPlacement": "top",
+          "show": true
+        },
+        "legend": {
+          "show": true,
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "show": true,
+          "yHistogram": true
+        }
+      }
+    },
+    {
       "id": 140,
       "title": "🛡 Resilience patterns",
       "type": "row",
@@ -756,7 +933,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 61
+        "y": 85
       },
       "panels": []
     },
@@ -773,7 +950,7 @@
         "h": 8,
         "w": 6,
         "x": 0,
-        "y": 62
+        "y": 86
       },
       "targets": [
         {
@@ -805,7 +982,7 @@
         "h": 8,
         "w": 6,
         "x": 6,
-        "y": 62
+        "y": 86
       },
       "targets": [
         {
@@ -833,7 +1010,7 @@
         "h": 8,
         "w": 6,
         "x": 12,
-        "y": 62
+        "y": 86
       },
       "targets": [
         {
@@ -861,7 +1038,7 @@
         "h": 8,
         "w": 6,
         "x": 18,
-        "y": 62
+        "y": 86
       },
       "targets": [
         {
@@ -885,7 +1062,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 71
+        "y": 94
       },
       "panels": []
     },
@@ -902,7 +1079,7 @@
         "h": 6,
         "w": 8,
         "x": 0,
-        "y": 72
+        "y": 95
       },
       "targets": [
         {
@@ -920,7 +1097,7 @@
     {
       "id": 152,
       "title": "Активные сессии",
-      "description": "Gauge числа активных in-memory сессий backend.",
+      "description": "Gauge числа активных посетителей: сессия создаётся при первом запросе клиента (анонимный cookie) и живёт, пока он шлёт запросы (TTL 10с). Не зависит от входа в систему.",
       "type": "stat",
       "datasource": {
         "type": "victoriametrics-metrics-datasource",
@@ -930,7 +1107,7 @@
         "h": 6,
         "w": 8,
         "x": 8,
-        "y": 72
+        "y": 95
       },
       "targets": [
         {
@@ -958,7 +1135,7 @@
         "h": 6,
         "w": 8,
         "x": 16,
-        "y": 72
+        "y": 95
       },
       "targets": [
         {
@@ -982,7 +1159,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 78
+        "y": 101
       },
       "panels": []
     },
@@ -999,7 +1176,7 @@
         "h": 6,
         "w": 8,
         "x": 0,
-        "y": 79
+        "y": 102
       },
       "targets": [
         {
@@ -1027,7 +1204,7 @@
         "h": 6,
         "w": 8,
         "x": 8,
-        "y": 79
+        "y": 102
       },
       "targets": [
         {
@@ -1055,7 +1232,7 @@
         "h": 6,
         "w": 8,
         "x": 16,
-        "y": 79
+        "y": 102
       },
       "targets": [
         {
@@ -1079,7 +1256,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 85
+        "y": 108
       },
       "panels": []
     },
@@ -1096,7 +1273,7 @@
         "h": 6,
         "w": 12,
         "x": 0,
-        "y": 86
+        "y": 109
       },
       "targets": [
         {
@@ -1128,7 +1305,7 @@
         "h": 6,
         "w": 12,
         "x": 12,
-        "y": 86
+        "y": 109
       },
       "targets": [
         {

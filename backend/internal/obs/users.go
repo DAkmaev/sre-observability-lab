@@ -11,6 +11,7 @@ import (
 	"encoding/hex"
 	"net/http"
 	"sync"
+	"time"
 
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
@@ -38,11 +39,24 @@ func withUser(ctx context.Context, u User) context.Context {
 // ── In-memory хранилище сессий ────────────────────────────────────────────
 // Стенд учебный: перезапуск backend обнуляет сессии (users/отзывы/склад
 // остаются в БД). Токен — случайный hex, фронт хранит его в localStorage.
+// Сессии живут пока активен клиент и не дольше sessionTTL: у каждой сессии
+// есть срок ExpiresAt, который продлевается при Get, а устаревшие сессии
+// периодически вычищает goroutine-уборщик (SessionStore.StartJanitor).
+// Это гарантирует, что gauge активных сессий падает, даже если клиент
+// (например, скрипт) закончился, не позвав DELETE /api/session.
+
+// sessionTTL — время жизни сессии без обращений.
+const sessionTTL = 15 * time.Minute
 
 // Session описывает одну активную сессию.
 type Session struct {
-	Token string
-	User  User
+	Token     string
+	User      User
+	ExpiresAt time.Time
+}
+
+func (s Session) expired() bool {
+	return time.Now().After(s.ExpiresAt)
 }
 
 // SessionStore хранит token → session в памяти. Потокобезопасен.
@@ -60,6 +74,40 @@ type sessionStore struct {
 	onSize   func(int)
 }
 
+// StartJanitor запускает периодическую уборку устаревших сессий. Stop по
+// завершении контекста; не блокирует навсегда — для остановки горутины
+// достаточно отмены ctx, остальное уборочный цикл беспрепятственно завершит.
+func (s *sessionStore) StartJanitor(ctx context.Context) {
+	go func() {
+		interval := sessionTTL / 3
+		ticker := time.NewTicker(interval)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				s.SweepExpired()
+			}
+		}
+	}()
+}
+
+// SweepExpired удаляет все истёкшие сессии (вызывается и вручную из тестов).
+func (s *sessionStore) SweepExpired() {
+	removed := false
+	s.sessions.Range(func(k, v interface{}) bool {
+		if v.(Session).expired() {
+			s.sessions.Delete(k)
+			removed = true
+		}
+		return true
+	})
+	if removed {
+		s.notify()
+	}
+}
+
 func randomToken() string {
 	b := make([]byte, 24)
 	_, _ = rand.Read(b)
@@ -69,18 +117,28 @@ func randomToken() string {
 // Create выдаёт новый токен для пользователя.
 func (s *sessionStore) Create(user User) string {
 	token := randomToken()
-	s.sessions.Store(token, Session{Token: token, User: user})
+	s.sessions.Store(token, Session{Token: token, User: user, ExpiresAt: time.Now().Add(sessionTTL)})
 	s.notify()
 	return token
 }
 
-// Get возвращает сессию по токену.
+// Get возвращает сессию по токену и продлевает её срок жизни. Устаревшая
+// сессия считается неактивной, пока её не вычистит janitor.
 func (s *sessionStore) Get(token string) (Session, bool) {
 	v, ok := s.sessions.Load(token)
 	if !ok {
 		return Session{}, false
 	}
-	return v.(Session), true
+	sess := v.(Session)
+	if sess.expired() {
+		// Немедленно выкидываем и сбрасываем gauge в том же потоке.
+		s.sessions.Delete(token)
+		s.notify()
+		return Session{}, false
+	}
+	sess.ExpiresAt = time.Now().Add(sessionTTL)
+	s.sessions.Store(token, sess)
+	return sess, true
 }
 
 // Delete удаляет сессию по токену.
