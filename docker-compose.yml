@@ -34,7 +34,7 @@ services:
       RECOMMENDATIONS_URL: "http://recommendations:8082"
       PAYMENT_URL: "http://payment:8083"
       RECOMMENDATIONS_FAILURE_MODE: "strict"
-      OTLP_ENDPOINT: "tempo:4318"
+      OTLP_ENDPOINT: "otel-collector:4318"
       LOG_LEVEL: "info"
     ports:
       - "8081:8081"
@@ -55,7 +55,7 @@ services:
     environment:
       SERVICE_NAME: recommendations
       HTTP_ADDR: ":8082"
-      OTLP_ENDPOINT: "tempo:4318"
+      OTLP_ENDPOINT: "otel-collector:4318"
       LOG_LEVEL: "info"
       CHAOS_FAIL_RATE: "0"
       CHAOS_LATENCY_MS: "0"
@@ -74,7 +74,7 @@ services:
       SERVICE_NAME: payment
       HTTP_ADDR: ":8083"
       DATABASE_URL: "postgres://sre:sre@postgres:5432/store?sslmode=disable"
-      OTLP_ENDPOINT: "tempo:4318"
+      OTLP_ENDPOINT: "otel-collector:4318"
       LOG_LEVEL: "info"
       CHAOS_FAIL_RATE: "0"
       CHAOS_LATENCY_MS: "0"
@@ -204,8 +204,28 @@ services:
       - tempodata:/var/tempo
     ports:
       - "3200:3200"   # Tempo API (используется Grafana)
-      - "4317:4317"   # OTLP gRPC (не используем, но пусть будет открыт)
-      - "4318:4318"   # OTLP HTTP — именно сюда шлют трейсы backend/recommendations
+      # Внешние OTLP-порты вынесены на гостевые (3117/3118), потому что
+      # 4317/4318 теперь заняты OTel Collector, который принимает трафик от
+      # приложений и забирает трейсы у Tempo внутрь сети. Внутренние порты
+      # 4317/4318 у Tempo остаются для коллектора.
+      - "3117:4317"   # OTLP gRPC (гостевой; внутренний — для коллектора)
+      - "3118:4318"   # OTLP HTTP (гостевой; внутренний — для коллектора)
+    networks: [sre-lab]
+
+  # ── 7b. OTel Collector: приём OTLP от приложений → экспорт трейсов в
+  # Tempo + генерация service graph в VictoriaMetrics ────────────────────
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:latest
+    container_name: sre-otel-collector
+    command: ["--config=/etc/otel-collector.yaml"]
+    volumes:
+      - ./otel-collector/otel-collector.yaml:/etc/otel-collector.yaml:ro
+    ports:
+      - "4317:4317"   # OTLP gRPC — сюда шлют трейсы приложения
+      - "4318:4318"   # OTLP HTTP — сюда шлют трейсы приложения
+    depends_on:
+      - tempo
+      - victoriametrics
     networks: [sre-lab]
 
   # ── 5. Grafana ────────────────────────────────────────────────────────
