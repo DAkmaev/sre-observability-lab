@@ -156,7 +156,10 @@ services:
     ports:
       - "9093:9093"   # UI/API Alertmanager
     depends_on:
-      - alertreceiver
+      alertreceiver:
+        condition: service_started
+      mailpit:
+        condition: service_healthy
     networks: [sre-lab]
 
   # ── 6d. alertreceiver: печатает уведомления в stdout (для стенда) ────
@@ -167,6 +170,23 @@ services:
     environment:
       SERVICE_NAME: alertreceiver
       HTTP_ADDR: ":9119"
+    networks: [sre-lab]
+
+  # ── 6e. Mailpit: тестовый SMTP-сервер, ловит письма и показывает их в UI.
+  # SMTP: mailpit:1025 (нужен Alertmanager), UI: http://localhost:8025 ─────
+  mailpit:
+    image: axllent/mailpit:latest
+    container_name: sre-mailpit
+    ports:
+      - "8025:8025"    # UI просмотра писем
+      # 1025 (SMTP) наружу не публикуем — хватает внутренней сети sre-lab
+    healthcheck:
+      # Встроенная проверка Mailpit: подключается к /readyz и завершается
+      # кодом 0 при доступном сервисе (внутри docker сам определяет порт).
+      test: ["CMD", "/mailpit", "readyz"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
     networks: [sre-lab]
 
   # ── 8. VictoriaLogs (хранилище логов) ────────────────────────────────

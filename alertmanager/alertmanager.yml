@@ -1,14 +1,20 @@
 # Alertmanager: приём алертов от vmalert, дедупликация, группировка,
 # маршрутизация и отправка уведомлений в каналы оповещения.
 #
-# Для локального стенда приёмником уведомлений выступает крошечный
-# HTTP-сервис alertreceiver (python), который печатает каждое уведомление
-# в stdout контейнера — а его уже подбирает Vector и шлёт в VictoriaLogs.
-# Так студенты видят весь путь алерта без привязки к внешним сервисам
-# (Slack/Telegram/email). Замените url на реальный webhook — и готово.
+# Для локального стенда уведомления дублируются в два канала:
+#   1) крошечный HTTP-сервис alertreceiver, который печатает каждое
+#      уведомление в stdout контейнера — его подбирает Vector и шлёт
+#      в VictoriaLogs (виден весь путь алерта без внешних сервисов);
+#   2) тестовый SMTP-сервер Mailpit (UI: http://localhost:8025), чтобы
+#      наглядно посмотреть, как выглядят письма.
+# Для реальной эксплуатации замените webhook-URL и smtp_smarthost на свои.
 
 global:
   resolve_timeout: 5m
+  # Тестовый SMTP-сервер Mailpit (см. docker-compose). TLS/auth не требует.
+  smtp_smarthost: "mailpit:1025"
+  smtp_from: "alertmanager@sre-lab"
+  smtp_require_tls: false
 
 route:
   # Группируем по имени алерта и сервису, чтобы не спамить одним инцидентом.
@@ -16,13 +22,25 @@ route:
   group_wait: 10s
   group_interval: 30s
   repeat_interval: 2m
-  receiver: "lab-webhook"
+  receiver: "all-notifications"
 
 receivers:
-  - name: "lab-webhook"
+  # Всё дублируется и в учебный webhook, и на тестовую почту Mailpit,
+  # чтобы студенты видели оба пути доставки уведомлений.
+  - name: "all-notifications"
     webhook_configs:
       - url: "http://alertreceiver:9119/alert"
         send_resolved: true
+    email_configs:
+      - to: "sre-team@example.com"
+        send_resolved: true
+        html: |
+          {{ range .Alerts }}
+            <b>{{ .Labels.alertname }}</b> ({{ .Status }})
+            service={{ .Labels.service }} severity={{ .Labels.availability }}
+            {{ .Annotations.description }}
+            <br/>
+          {{ end }}
 
 inhibit_rules:
   # Погасить менее конкретные алерты, если уже горит более серьёзный

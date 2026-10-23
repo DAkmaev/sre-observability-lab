@@ -6,6 +6,7 @@ package obs
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
@@ -158,7 +159,8 @@ func Instrument(m *Metrics, logger *slog.Logger, method, route string, next http
 
 		log := WithTrace(r.Context(), logger)
 		level := accessLevel(status)
-		log.Log(r.Context(), level, "http_request",
+		log.Log(r.Context(), level,
+			fmt.Sprintf("%s %s -> %d %s", method, route, status, http.StatusText(status)),
 			"request_id", RequestIDFromContext(r.Context()),
 			"method", method,
 			"route", route,
@@ -211,6 +213,7 @@ func InstrumentServer(m *Metrics, logger *slog.Logger, next http.Handler) http.H
 		if u, ok := UserFromContext(r.Context()); ok {
 			log = log.With("user_id", u.ID, "user_role", u.Role)
 		}
-		log.Log(r.Context(), accessLevel(rec.status), "http_request")
+		log.Log(r.Context(), accessLevel(rec.status),
+			fmt.Sprintf("%s %s -> %d %s", r.Method, route, rec.status, http.StatusText(rec.status)))
 	})
 }

@@ -44,7 +44,7 @@ func newHandler(logger *slog.Logger) http.Handler {
 	mux := http.NewServeMux()
 
 	// Alertmanager дергает POST на /alert. Точка входа webhook'а в
-	// alertmanager.yml (receiver lab-webhook → url).
+	// alertmanager.yml (receiver all-notifications → url).
 	mux.HandleFunc("POST /alert", func(w http.ResponseWriter, r *http.Request) {
 		var body webhookBody
 		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {

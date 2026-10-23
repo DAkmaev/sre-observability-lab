@@ -6,6 +6,7 @@ package obs
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
@@ -156,7 +157,8 @@ func Instrument(m *Metrics, logger *slog.Logger, method, route string, next http
 		m.RequestDuration.WithLabelValues(method, route).Observe(duration)
 
 		log := WithTrace(r.Context(), logger)
-		log.Log(r.Context(), accessLevel(status), "http_request",
+		log.Log(r.Context(), accessLevel(status),
+			fmt.Sprintf("%s %s -> %d %s", method, route, status, http.StatusText(status)),
 			"request_id", RequestIDFromContext(r.Context()),
 			"method", method,
 			"route", route,
