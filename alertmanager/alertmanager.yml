@@ -16,6 +16,11 @@ global:
   smtp_from: "alertmanager@sre-lab"
   smtp_require_tls: false
 
+# Именованные шаблоны писем (рендер Subject и тела из .Alerts, а не GroupLabels,
+# чтобы были видны severity/availability и не зависеть от group_by).
+templates:
+  - "/etc/alertmanager/template.tmpl"
+
 route:
   # Группируем по имени алерта и сервису, чтобы не спамить одним инцидентом.
   group_by: ["alertname", "service"]
@@ -34,13 +39,9 @@ receivers:
     email_configs:
       - to: "sre-team@example.com"
         send_resolved: true
-        html: |
-          {{ range .Alerts }}
-            <b>{{ .Labels.alertname }}</b> ({{ .Status }})
-            service={{ .Labels.service }} severity={{ .Labels.availability }}
-            {{ .Annotations.description }}
-            <br/>
-          {{ end }}
+        headers:
+          Subject: '{{ template "email.default.subject" . }}'
+        html: '{{ template "email.default.html" . }}'
 
 inhibit_rules:
   # Погасить менее конкретные алерты, если уже горит более серьёзный

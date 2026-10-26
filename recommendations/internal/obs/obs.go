@@ -10,6 +10,7 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"strconv"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -166,7 +167,7 @@ func Instrument(m *Metrics, logger *slog.Logger, method, route string, next http
 		duration := time.Since(start).Seconds()
 		status := rec.status
 
-		m.RequestsTotal.WithLabelValues(method, route, http.StatusText(status)).Inc()
+		m.RequestsTotal.WithLabelValues(method, route, strconv.Itoa(status)).Inc()
 		m.RequestDuration.WithLabelValues(method, route).Observe(duration)
 
 		log := WithTrace(r.Context(), logger)

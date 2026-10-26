@@ -10,6 +10,7 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -154,7 +155,7 @@ func Instrument(m *Metrics, logger *slog.Logger, method, route string, next http
 		duration := time.Since(start).Seconds()
 		status := rec.status
 
-		m.RequestsTotal.WithLabelValues(method, route, http.StatusText(status)).Inc()
+		m.RequestsTotal.WithLabelValues(method, route, strconv.Itoa(status)).Inc()
 		m.RequestDuration.WithLabelValues(method, route).Observe(duration)
 
 		log := WithTrace(r.Context(), logger)
@@ -200,7 +201,7 @@ func InstrumentServer(m *Metrics, logger *slog.Logger, next http.Handler) http.H
 		} else if strings.HasPrefix(route, "/api/products/") {
 			route = "/api/products/:id"
 		}
-		m.RequestsTotal.WithLabelValues(r.Method, route, http.StatusText(rec.status)).Inc()
+		m.RequestsTotal.WithLabelValues(r.Method, route, strconv.Itoa(rec.status)).Inc()
 		m.RequestDuration.WithLabelValues(r.Method, route).Observe(time.Since(start).Seconds())
 
 		log := WithTrace(r.Context(), logger).With(

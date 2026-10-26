@@ -132,6 +132,7 @@ services:
       - "-datasource.url=http://victoriametrics:8428"
       - "-notifier.url=http://alertmanager:9093"
       - "-httpListenAddr=:8880"
+      - "-evaluationInterval=5s"
     volumes:
       - ./vmalert/alerts.yml:/etc/vmalert/alerts.yml:ro
     ports:
@@ -152,6 +153,7 @@ services:
       - "--web.listen-address=:9093"
     volumes:
       - ./alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - ./alertmanager/template.tmpl:/etc/alertmanager/template.tmpl:ro
       - amdata:/data
     ports:
       - "9093:9093"   # UI/API Alertmanager

@@ -363,7 +363,7 @@
       },
       "targets": [
         {
-          "expr": "sum(rate(recommendations_http_requests_total{status!=\"OK\"}[1m])) by (status)",
+          "expr": "sum(rate(recommendations_http_requests_total{status!~\"2.*\"}[1m])) by (status)",
           "legendFormat": "{{status}}"
         }
       ],
@@ -576,7 +576,7 @@
       },
       "targets": [
         {
-          "expr": "sum(rate(backend_http_requests_total{status!=\"OK\"}[1m])) by (route, status)",
+          "expr": "sum(rate(backend_http_requests_total{status!~\"2.*\"}[1m])) by (route, status)",
           "legendFormat": "{{route}} — {{status}}"
         }
       ],

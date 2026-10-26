@@ -202,7 +202,7 @@ docker compose start recommendations
 | Группа | Пример алерта | Что отслеживает |
 |---|---|---|
 | `availability` | `TargetDown`, `BackendScrapeFailing` | `up == 0`, недоступность целей |
-| `red-errors` | `HighErrorRate` | Доля не-2xx ответов за 5 минут |
+| `red-errors` | `HighErrorRate` | Доля не-2xx ответов за минуту |
 | `red-duration` | `HighLatencyBackend` | p95 задержки ответа |
 | `resilience` | `CircuitBreakerOpen`, `RetriesExhausted`, `ManyBulkheadRejections` | Паттерны отказоустойчивости |
 | `business` | `LowStockProducts`, `HighOutOfStockRate` | Бизнес-метрики стенда |

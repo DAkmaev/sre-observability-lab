@@ -1,0 +1,19 @@
+{{ define "email.default.subject" -}}
+{{- if ne (len .Alerts.Firing) 0 -}}[FIRING]{{- else -}}[RESOLVED]{{- end }} {{- range .Alerts }} {{ .Labels.alertname }}{{- end }} — {{ (index .Alerts 0).Labels.service }}{{ if .CommonLabels.severity }} ({{ .CommonLabels.severity }}){{ end -}}
+{{- end }}
+
+{{ define "email.default.html" -}}
+{{- range .Alerts }}
+<p><b>{{ .Labels.alertname }}</b> — {{ if .Annotations.title }}{{ .Annotations.title }}{{ else }}безымянный алерт{{ end }}</p>
+<ul>
+  <li>Статус: {{ .Status }}</li>
+  <li>Сервис: {{ if .Labels.service }}{{ .Labels.service }}{{ else }}-{{ end }}</li>
+  <li>Severity: {{ if .Labels.severity }}{{ .Labels.severity }}{{ else }}-{{ end }} (availability: {{ if .Labels.availability }}{{ .Labels.availability }}{{ else }}-{{ end }})</li>
+  <li>Описание: {{ if .Annotations.description }}{{ .Annotations.description }}{{ else }}-{{ end }}</li>
+  <li>Старт: {{ .StartsAt.Format "2006-01-02 15:04:05 MST" }}</li>
+  {{- if not .EndsAt.IsZero }}
+  <li>Конец: {{ .EndsAt.Format "2006-01-02 15:04:05 MST" }}</li>
+  {{- end }}
+</ul>
+{{- end }}
+{{- end }}

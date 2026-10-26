@@ -16,7 +16,7 @@ groups:
     rules:
       - alert: TargetDown
         expr: up == 0
-        for: 30s
+        for: 1s
         labels:
           severity: critical
           availability: Critical
@@ -28,7 +28,7 @@ groups:
       # удобно для демонстрации "падающей цели" на /targets.
       - alert: BackendScrapeFailing
         expr: up{job="backend"} == 0
-        for: 15s
+        for: 1s
         labels:
           severity: warning
           availability: Low
@@ -40,45 +40,45 @@ groups:
   - name: red-errors
     rules:
       - alert: HighErrorRate
-        # Статус у http_requests_total — текстовый (http.StatusText), поэтому
-        # считаем ошибкой всё, что не начинается на "2" (200, 200 OK и т.п.).
+        # Статус у http_requests_total — сырой HTTP-код (200, 404, 500 и т.п.).
+        # Считаем ошибкой всё, что не начинается на "2" (2xx-класс ответа).
         expr: |
-          sum(rate(backend_http_requests_total{status!~"2.*"}[5m])) /
-          sum(rate(backend_http_requests_total[5m])) > 0.15
-        for: 2m
+          sum(rate(backend_http_requests_total{status!~"2.*"}[1m])) /
+          sum(rate(backend_http_requests_total[1m])) > 0.15
+        for: 30s
         labels:
           severity: critical
           service: backend
           availability: High
         annotations:
           title: "Backend: доля ошибок высокая"
-          description: "Доля не-2xx ответов backend за 5 минут превысила 15% (текущая: {{ $value }})."
+          description: "Доля не-2xx ответов backend за 1 минуту превысила 15% (текущая: {{ $value }})."
 
       - alert: HighErrorRatePayment
         expr: |
-          sum(rate(payment_http_requests_total{status!~"2.*"}[5m])) /
-          sum(rate(payment_http_requests_total[5m])) > 0.15
-        for: 2m
+          sum(rate(payment_http_requests_total{status!~"2.*"}[1m])) /
+          sum(rate(payment_http_requests_total[1m])) > 0.15
+        for: 30s
         labels:
           severity: warning
           service: payment
           availability: Medium
         annotations:
           title: "Payment: доля ошибок высокая"
-          description: "Доля не-2xx ответов payment за 5 минут превысила 15% (текущая: {{ $value }})."
+          description: "Доля не-2xx ответов payment за 1 минуту превысила 15% (текущая: {{ $value }})."
 
       - alert: HighErrorRateRecommendations
         expr: |
-          sum(rate(recommendations_http_requests_total{status!~"2.*"}[5m])) /
-          sum(rate(recommendations_http_requests_total[5m])) > 0.15
-        for: 2m
+          sum(rate(recommendations_http_requests_total{status!~"2.*"}[1m])) /
+          sum(rate(recommendations_http_requests_total[1m])) > 0.15
+        for: 30s
         labels:
           severity: warning
           service: recommendations
           availability: Medium
         annotations:
           title: "Recommendations: доля ошибок высокая"
-          description: "Доля не-2xx ответов recommendations за 5 минут превысила 15% (текущая: {{ $value }})."
+          description: "Доля не-2xx ответов recommendations за 1 минуту превысила 15% (текущая: {{ $value }})."
 
   # ── RED: задержка (Duration) — смотрим p95, как учит RED ────────────
   - name: red-duration
@@ -87,24 +87,24 @@ groups:
         expr: |
           histogram_quantile(
             0.95,
-            sum by (le) (rate(backend_http_request_duration_seconds_bucket[5m]))
+            sum by (le) (rate(backend_http_request_duration_seconds_bucket[1m]))
           ) > 1.0
-        for: 2m
+        for: 30s
         labels:
           severity: warning
           service: backend
           availability: Medium
         annotations:
           title: "Backend: p95 задержка > 1 c"
-          description: "За последние 5 минут p95 задержки ответа backend превысила 1 секунду (p95 = {{ $value }}s). Проверяем БД и внешние зависимости."
+          description: "За последнюю минуту p95 задержки ответа backend превысила 1 секунду (p95 = {{ $value }}s). Проверяем БД и внешние зависимости."
 
       - alert: HighLatencyRecommendations
         expr: |
           histogram_quantile(
             0.95,
-            sum by (le) (rate(recommendations_http_request_duration_seconds_bucket[5m]))
+            sum by (le) (rate(recommendations_http_request_duration_seconds_bucket[1m]))
           ) > 1.0
-        for: 2m
+        for: 30s
         labels:
           severity: warning
           service: recommendations
@@ -118,7 +118,7 @@ groups:
     rules:
       - alert: CircuitBreakerOpen
         expr: backend_circuit_breaker_state == 2
-        for: 1m
+        for: 15s
         labels:
           severity: critical
           service: backend
@@ -128,55 +128,55 @@ groups:
           description: "Circuit breaker до recommendations открыт >1 мин — трафик к этой зависимости сейчас не идёт (state=2 open)."
 
       - alert: RetriesExhausted
-        expr: increase(backend_resilience_retry_exhausted_total[5m]) > 5
-        for: 1m
+        expr: increase(backend_resilience_retry_exhausted_total[1m]) > 5
+        for: 15s
         labels:
           severity: warning
           service: backend
           availability: Medium
         annotations:
           title: "Исчерпаны ретраи к {{ $labels.dependency }}"
-          description: "За 5 минут ретраи к зависимости {{ $labels.dependency }} исчерпаны более 5 раз."
+          description: "За 1 минуту ретраи к зависимости {{ $labels.dependency }} исчерпаны более 5 раз."
 
       - alert: ManyBulkheadRejections
-        expr: increase(backend_resilience_bulkhead_rejections_total[5m]) > 20
-        for: 1m
+        expr: increase(backend_resilience_bulkhead_rejections_total[1m]) > 20
+        for: 15s
         labels:
           severity: warning
           service: backend
           availability: Medium
         annotations:
           title: "Bulkhead активно отклоняет запросы"
-          description: "Перегородка за 5 минут отклонила {{ $value }} запросов к {{ $labels.dependency }} — пул ресурсов исчерпан."
+          description: "Перегородка за 1 минуту отклонила {{ $value }} запросов к {{ $labels.dependency }} — пул ресурсов исчерпан."
 
   # ── Бизнес-метрики стенда ────────────────────────────────────────────
   - name: business
     rules:
       - alert: LowStockProducts
         expr: backend_low_stock_products > 0
-        for: 5m
+        for: 30s
         labels:
           severity: warning
           service: backend
           availability: Low
         annotations:
           title: "Товары закончились на складе"
-          description: "Число товаров с нулевым остатком = {{ $value }} уже 5 минут. Требуется restock через админ-панель."
+          description: "Число товаров с нулевым остатком = {{ $value }} уже 30 секунд. Требуется restock через админ-панель."
 
       - alert: HighOutOfStockRate
-        expr: increase(backend_out_of_stock_events_total[10m]) > 3
-        for: 2m
+        expr: increase(backend_out_of_stock_events_total[2m]) > 3
+        for: 30s
         labels:
           severity: warning
           service: backend
           availability: Medium
         annotations:
           title: "Партия товаров ушла в 'нет в наличии'"
-          description: "За 10 минут более {{ $value }} товаров перешли в состояние 'нет в наличии'."
+          description: "За 2 минуты более {{ $value }} товаров перешли в состояние 'нет в наличии'."
 
       - alert: TooManyValidationRejectedReviews
         expr: backend_reviews_rejected_total / clamp_min(backend_reviews_posted_total, 1) > 0.5
-        for: 5m
+        for: 30s
         labels:
           severity: warning
           service: backend
@@ -190,13 +190,13 @@ groups:
     rules:
       - alert: RecommendationsRateLimited
         expr: |
-          increase(recommendations_rate_limit_rejections_total[5m]) > 0
+          increase(recommendations_rate_limit_rejections_total[1m]) > 0
             and on() recommendations_rate_limit_requests_per_second > 0
-        for: 1m
+        for: 15s
         labels:
           severity: warning
           service: recommendations
           availability: Medium
         annotations:
           title: "Recommendations отклоняет запросы лимитером"
-          description: "Rate limiter recommendations сработал: {{ $value }} отказов за 5 минут (rps лимита > 0)."
+          description: "Rate limiter recommendations сработал: {{ $value }} отказов за 1 минуту (rps лимита > 0)."
