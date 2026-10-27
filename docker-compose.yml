@@ -116,6 +116,7 @@ services:
       - "--httpListenAddr=:8428"
       - "--promscrape.config=/etc/vm/scrape.yml"
       - "--selfScrapeInterval=10s"
+      - "--search.latencyOffset=0s"
     volumes:
       - ./victoriametrics/scrape.yml:/etc/vm/scrape.yml:ro
       - vmdata:/storage
