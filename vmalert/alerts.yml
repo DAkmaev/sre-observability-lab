@@ -10,193 +10,167 @@
 #   - паттерны отказоустойчивости (circuit breaker, retry, bulkhead);
 #   - бизнес-метрики стенда (склад, пользователи, отзывы).
 
+
 groups:
-  # ── Доступность экземпляров (Uptime) ─────────────────────────────────
-  - name: availability
-    rules:
-      - alert: TargetDown
-        expr: up == 0
-        for: 1s
-        labels:
-          severity: critical
-          availability: Critical
-        annotations:
-          title: "Экземпляр {{ $labels.job }} недоступен"
-          description: "Скрейпер длительно не может получить /metrics у {{ $labels.job }}. Сервис может быть остановлен или не отвечает."
-
-      # Валидируем, что алерт пишется по недоступности ВСЕХ трёх сервисов;
-      # удобно для демонстрации "падающей цели" на /targets.
-      - alert: BackendScrapeFailing
-        expr: up{job="backend"} == 0
-        for: 1s
-        labels:
-          severity: warning
-          availability: Low
-        annotations:
-          title: "Backend не скрейпится"
-          description: "VictoriaMetrics не получает метрики от backend уже больше 15 секунд."
-
-  # ── RED: частота ошибок (Errors) по статусу != 2xx ───────────────────
-  - name: red-errors
-    rules:
-      - alert: HighErrorRate
-        # Статус у http_requests_total — сырой HTTP-код (200, 404, 500 и т.п.).
-        # Считаем ошибкой всё, что не начинается на "2" (2xx-класс ответа).
-        expr: |
-          sum(rate(backend_http_requests_total{status!~"2.*"}[1m])) /
-          sum(rate(backend_http_requests_total[1m])) > 0.15
-        for: 30s
-        labels:
-          severity: critical
-          service: backend
-          availability: High
-        annotations:
-          title: "Backend: доля ошибок высокая"
-          description: "Доля не-2xx ответов backend за 1 минуту превысила 15% (текущая: {{ $value }})."
-
-      - alert: HighErrorRatePayment
-        expr: |
-          sum(rate(payment_http_requests_total{status!~"2.*"}[1m])) /
-          sum(rate(payment_http_requests_total[1m])) > 0.15
-        for: 30s
-        labels:
-          severity: warning
-          service: payment
-          availability: Medium
-        annotations:
-          title: "Payment: доля ошибок высокая"
-          description: "Доля не-2xx ответов payment за 1 минуту превысила 15% (текущая: {{ $value }})."
-
-      - alert: HighErrorRateRecommendations
-        expr: |
-          sum(rate(recommendations_http_requests_total{status!~"2.*"}[1m])) /
-          sum(rate(recommendations_http_requests_total[1m])) > 0.15
-        for: 30s
-        labels:
-          severity: warning
-          service: recommendations
-          availability: Medium
-        annotations:
-          title: "Recommendations: доля ошибок высокая"
-          description: "Доля не-2xx ответов recommendations за 1 минуту превысила 15% (текущая: {{ $value }})."
-
-  # ── RED: задержка (Duration) — смотрим p95, как учит RED ────────────
+  # ── Симптомы: задержка (Duration из RED), p95 ────────────────────────
   - name: red-duration
     rules:
       - alert: HighLatencyBackend
         expr: |
-          histogram_quantile(
-            0.95,
-            sum by (le) (rate(backend_http_request_duration_seconds_bucket[1m]))
-          ) > 1.0
-        for: 30s
+          histogram_quantile(0.95,
+            sum by (le) (rate(backend_http_request_duration_seconds_bucket[30s]))
+          ) > 1
+        for: 1m
         labels:
           severity: warning
           service: backend
-          availability: Medium
         annotations:
-          title: "Backend: p95 задержка > 1 c"
-          description: "За последнюю минуту p95 задержки ответа backend превысила 1 секунду (p95 = {{ $value }}s). Проверяем БД и внешние зависимости."
+          title: "Backend: p95 задержки > 1 c"
+          description: "p95 backend = {{ $value | humanizeDuration }}. Проверьте БД и зависимости (recommendations, payment)."
+          runbook_url: "https://sre-lab.example/runbooks/HighLatency"
+
+      - alert: HighLatencyPayment
+        expr: |
+          histogram_quantile(0.95,
+            sum by (le) (rate(payment_http_request_duration_seconds_bucket[30s]))
+          ) > 1
+        for: 1m
+        labels:
+          severity: warning
+          service: payment
+        annotations:
+          title: "Payment: p95 задержки > 1 c"
+          description: "p95 payment = {{ $value | humanizeDuration }}. Оплата тормозит — растёт риск брошенных корзин."
+          runbook_url: "https://sre-lab.example/runbooks/HighLatency"
 
       - alert: HighLatencyRecommendations
         expr: |
-          histogram_quantile(
-            0.95,
-            sum by (le) (rate(recommendations_http_request_duration_seconds_bucket[1m]))
-          ) > 1.0
-        for: 30s
+          histogram_quantile(0.95,
+            sum by (le) (rate(recommendations_http_request_duration_seconds_bucket[30s]))
+          ) > 1
+        for: 1m
         labels:
           severity: warning
           service: recommendations
-          availability: Medium
         annotations:
-          title: "Recommendations: p95 задержка > 1 c"
-          description: "p95 задержки recommendations превысила 1 секунду — похоже на rate limit или перегрузку."
+          title: "Recommendations: p95 задержки > 1 c"
+          description: "p95 recommendations = {{ $value | humanizeDuration }}. Похоже на перегрузку или деградацию зависимости."
+          runbook_url: "https://sre-lab.example/runbooks/HighLatency"
 
-  # ── Паттерны отказоустойчивости ─────────────────────────────────────
+  # ── Доступность целей скрейпа ────────────────────────────────────────
+  - name: availability
+    rules:
+      - alert: TargetDown
+        expr: up == 0
+        for: 5s
+        labels:
+          severity: '{{ if or (eq $labels.job "backend") (eq $labels.job "payment") }}critical{{ else }}warning{{ end }}'
+          service: "{{ $labels.job }}"
+          dependency: "{{ $labels.job }}"
+        annotations:
+          title: "{{ $labels.job }} недоступен"
+          description: "VictoriaMetrics не может скрейпить {{ $labels.instance }} (job={{ $labels.job }}). Важность зависит от роли сервиса: backend и payment критичны, остальные терпят до рабочего времени."
+          runbook_url: "https://sre-lab.example/runbooks/TargetDown"
+
+  # ── Паттерны отказоустойчивости: ПРИЧИНЫ, не симптомы ────────────────
+  # Нужны для диагностики; пользователя может не затрагивать вовсе,
+  # поэтому максимум warning. Если пользователь страдает — сработает SLO-алерт.
   - name: resilience
     rules:
       - alert: CircuitBreakerOpen
-        expr: backend_circuit_breaker_state == 2
-        for: 15s
+        expr: backend_payment_circuit_breaker_state == 2
+        for: 5s
         labels:
-          severity: critical
+          severity: warning
           service: backend
-          availability: High
+          dependency: payment
         annotations:
           title: "Circuit breaker разомкнут"
-          description: "Circuit breaker до recommendations открыт >1 мин — трафик к этой зависимости сейчас не идёт (state=2 open)."
+          description: "Backend перестал ходить в зависимость (state=2, open; breaker есть и у recommendations, и у payment). Если включён режим деградации — пользователь этого не заметит; иначе — заметит (смотрите SLO-алерты)."
+          runbook_url: "https://sre-lab.example/runbooks/CircuitBreakerOpen"
 
       - alert: RetriesExhausted
         expr: increase(backend_resilience_retry_exhausted_total[1m]) > 5
-        for: 15s
+        for: 5s
         labels:
           severity: warning
           service: backend
-          availability: Medium
         annotations:
           title: "Исчерпаны ретраи к {{ $labels.dependency }}"
-          description: "За 1 минуту ретраи к зависимости {{ $labels.dependency }} исчерпаны более 5 раз."
+          description: "За минуту ретраи к {{ $labels.dependency }} исчерпаны {{ $value }} раз(а)."
+          runbook_url: "https://sre-lab.example/runbooks/RetriesExhausted"
 
       - alert: ManyBulkheadRejections
         expr: increase(backend_resilience_bulkhead_rejections_total[1m]) > 20
-        for: 15s
+        for: 5s
         labels:
           severity: warning
           service: backend
-          availability: Medium
         annotations:
-          title: "Bulkhead активно отклоняет запросы"
-          description: "Перегородка за 1 минуту отклонила {{ $value }} запросов к {{ $labels.dependency }} — пул ресурсов исчерпан."
+          title: "Bulkhead отклоняет запросы к {{ $labels.dependency }}"
+          description: "За минуту отклонено {{ $value }} запросов к {{ $labels.dependency }}: пул ресурсов исчерпан."
+          runbook_url: "https://sre-lab.example/runbooks/Bulkhead"
 
-  # ── Бизнес-метрики стенда ────────────────────────────────────────────
-  - name: business
-    rules:
-      - alert: LowStockProducts
-        expr: backend_low_stock_products > 0
-        for: 30s
-        labels:
-          severity: warning
-          service: backend
-          availability: Low
-        annotations:
-          title: "Товары закончились на складе"
-          description: "Число товаров с нулевым остатком = {{ $value }} уже 30 секунд. Требуется restock через админ-панель."
-
-      - alert: HighOutOfStockRate
-        expr: increase(backend_out_of_stock_events_total[2m]) > 3
-        for: 30s
-        labels:
-          severity: warning
-          service: backend
-          availability: Medium
-        annotations:
-          title: "Партия товаров ушла в 'нет в наличии'"
-          description: "За 2 минуты более {{ $value }} товаров перешли в состояние 'нет в наличии'."
-
-      - alert: TooManyValidationRejectedReviews
-        expr: backend_reviews_rejected_total / clamp_min(backend_reviews_posted_total, 1) > 0.5
-        for: 30s
-        labels:
-          severity: warning
-          service: backend
-          availability: Low
-        annotations:
-          title: "Много отзывов отклоняется валидацией"
-          description: "Отношение отклонённых отзывов к опубликованным > 0.5 — вероятно, сломан фронт или валидация."
-
-  # ── Резервные / демонстрационные алерты───────────────────────────────
-  - name: rate-limiting
-    rules:
+      # Лимитер, который работает как задумано, — не авария. Только информируем.
       - alert: RecommendationsRateLimited
         expr: |
           increase(recommendations_rate_limit_rejections_total[1m]) > 0
             and on() recommendations_rate_limit_requests_per_second > 0
-        for: 15s
+        for: 5s
+        labels:
+          severity: info
+          service: recommendations
+        annotations:
+          title: "Recommendations: сработал rate limiter"
+          description: "За минуту лимитер отклонил {{ $value }} запросов. 429 — не 5xx, в SLO не входит."
+
+  # ── Бизнес-метрики: info, адресат — владелец продукта ────────────────
+  - name: business
+    rules:
+      - alert: LowStockProducts
+        expr: backend_low_stock_products > 0
+        for: 10s
+        labels:
+          severity: info
+          service: backend
+        annotations:
+          title: "Есть товары с нулевым остатком"
+          description: "Товаров без остатка: {{ $value }}. Нужен restock через админ-панель."
+
+      - alert: HighOutOfStockRate
+        expr: increase(backend_out_of_stock_events_total[2m]) > 3
+        for: 10s
+        labels:
+          severity: info
+          service: backend
+        annotations:
+          title: "Товары быстро заканчиваются"
+          description: "За 2 минуты {{ $value }} товаров перешли в «нет в наличии»."
+
+      # доля за окно + минимальный объём, чтобы 1 отзыв из 1 не давал ложный алерт.
+      - alert: TooManyValidationRejectedReviews
+        expr: |
+          increase(backend_reviews_rejected_total[5m])
+            / clamp_min(increase(backend_reviews_posted_total[5m]), 1) > 0.5
+            and increase(backend_reviews_rejected_total[5m]) > 5
+        for: 30s
         labels:
           severity: warning
-          service: recommendations
-          availability: Medium
+          service: backend
         annotations:
-          title: "Recommendations отклоняет запросы лимитером"
-          description: "Rate limiter recommendations сработал: {{ $value }} отказов за 1 минуту (rps лимита > 0)."
+          title: "Много отзывов отклоняется валидацией"
+          description: "За 5 минут отклонено {{ $value | humanizePercentage }} отзывов (к опубликованным). Вероятно, сломан фронтенд или правила валидации."
+
+  # ── Метамониторинг: жив ли сам конвейер алертинга ────────────────────
+  - name: meta
+    rules:
+      # Горит всегда. Если уведомления Watchdog перестали приходить —
+      # сломан vmalert, Alertmanager или канал доставки.
+      - alert: Watchdog
+        expr: vector(1)
+        labels:
+          severity: none
+          service: alerting-pipeline
+        annotations:
+          title: "Конвейер алертинга жив"
+          description: "Постоянно горящий алерт: пропажа его уведомлений означает поломку vmalert/Alertmanager."

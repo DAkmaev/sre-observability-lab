@@ -23,22 +23,24 @@ flowchart TB
 считает сумму по ценам из БД и обращается к `payment` (тоже через
 отдельный circuit breaker) для списания денег.
 
-| # | Сервис | Роль | Порт на хосте |
-|---|---|---|---|
-| 1 | `frontend` | React-витрина товаров, корзина, оформление заказа | (только через gateway) |
-| 2 | `backend` | Go API: товары, карточка + рекомендации, оформление заказа (`/api/orders`) | `8081` |
-| 3 | `postgres` | Хранилище товаров, заказов и платежей | `5432` |
-| 4 | `recommendations` | Go, "хрупкая" зависимость для circuit breaker №1 | `8082` |
-| 5 | `payment` | Go, "хрупкая" зависимость для circuit breaker №2 (оплата заказа) | `8083` |
-| 6 | `grafana` | Дашборды и Explore для метрик/логов/трейсов | `3000` |
-| 7 | `victoriametrics` | Хранилище метрик (Prometheus-совместимое) | `8428` |
-| 8 | `tempo` | Хранилище трейсов (OTLP) | `3200`, `4317/4318` |
-| 9 | `victorialogs` | Хранилище логов | `9428` |
+| #  | Сервис | Роль | Порт на хосте |
+|----|---|---|---|
+| 1  | `frontend` | React-витрина товаров, корзина, оформление заказа | (только через gateway) |
+| 2  | `backend` | Go API: товары, карточка + рекомендации, оформление заказа (`/api/orders`) | `8081` |
+| 3  | `postgres` | Хранилище товаров, заказов и платежей | `5432` |
+| 4  | `recommendations` | Go, "хрупкая" зависимость для circuit breaker №1 | `8082` |
+| 5  | `payment` | Go, "хрупкая" зависимость для circuit breaker №2 (оплата заказа) | `8083` |
+| 6  | `grafana` | Дашборды и Explore для метрик/логов/трейсов | `3000` |
+| 7  | `victoriametrics` | Хранилище метрик (Prometheus-совместимое) | `8428` |
+| 8  | `tempo` | Хранилище трейсов (OTLP) | `3200`, `3117/3118` (гостевые OTLP) |
+| 9  | `victorialogs` | Хранилище логов | `9428` |
 | 10 | `gateway` | nginx, единая точка входа + X-Request-ID | `8080` |
 | 11 | `vmalert` | Выполняет алерты по метрикам, шлёт в Alertmanager | `8880` |
 | 12 | `alertmanager` | Дедупликация и маршрутизация уведомлений | `9093` |
-| — | `alertreceiver` | Печатает уведомления Alertmanager в stdout (для стенда) | — |
-| — | `vector` | Собирает stdout контейнеров → VictoriaLogs | — |
+| 13 | `otel-collector` | Приём OTLP от приложений → трейсы в Tempo + service graph метрики в VictoriaMetrics | `4317/4318` |
+| 14 | `alertreceiver` | Печатает уведомления Alertmanager в stdout (для стенда) | — |
+| 15 | `mailpit` | Тестовый SMTP-сервер: ловит email-уведомления Alertmanager, UI просмотра писем | `8025` |
+| 16 | `vector` | Собирает stdout контейнеров → VictoriaLogs | — |
 
 ## Запуск
 
@@ -59,6 +61,7 @@ docker compose ps        # все сервисы должны быть healthy/r
 - **Alertmanager UI** (активные алерты): http://localhost:9093
 - **VictoriaLogs UI**: http://localhost:9428
 - **Tempo** (обычно смотрят через Grafana, не напрямую): http://localhost:3200
+- **Mailpit** (входящие email-уведомления Alertmanager): http://localhost:8025
 
 Проверить, что стенд наполняется данными — открыть витрину и покликать
 несколько товаров: это создаст трафик, который сразу увидят метрики, логи
@@ -163,6 +166,11 @@ VictoriaMetrics  ──(скрейп)──▶  метрики
   так же, как обычные логи сервисов (через Grafana → Explore → VictoriaLogs,
   `source:"alertreceiver"`, по полю `msg="alert_notification"`). Есть
   `/healthz` и метрика `up{job="alertreceiver"}`.
+- **Mailpit** — тестовый SMTP-сервер: Alertmanager отправляет email-уведомления
+  на SMTP `mailpit:1025`, а письма смотрят в веб-UI на http://localhost:8025.
+  Для локального стенда не нужен реальный почтовый ящик — достаточно открыть
+  Mailpit и увидеть «пришедшее» письмо (заголовки, HTML-шаблон
+  `alertmanager/template.tmpl`).
 
 ### Как проверить алерты
 
@@ -209,7 +217,23 @@ docker compose start recommendations
 | `rate-limiting` | `RecommendationsRateLimited` | Отказы rate limiter'а |
 
 Чтобы отправить алерты в реальный канал (Slack/Telegram/email), замените
-`url` в `receivers` в `alertmanager/alertmanager.yml` на свой webhook.
+`url` в `receivers` в `alertmanager/alertmanager.yml` на свой webhook (либо
+укажите настоящий SMTP-смартхост и адрес в `email_configs` вместо Mailpit).
+
+### Материалы по алертингу для лекции 8
+
+- **`docs/lecture-08-alerting-practical.md`** — практические сценарии к лекции
+  «Алертинг», привязанные к слайдам (pipeline, symptom/cause, `for`,
+  grouping, inhibit, on-call).
+- **`docs/lecture-08-teaching-track.md`** — хронометраж ведения лекции на 90 минут.
+- **`scripts/demo-alerting.sh`** — интерактивное воспроизведение всех сценариев:
+
+  ```bash
+  ./scripts/demo-alerting.sh all        # все демо подряд
+  ./scripts/demo-alerting.sh pipeline   # одно конкретное демо
+  # меню доступных демо:
+  ./scripts/demo-alerting.sh
+  ```
 
 ## Структура репозитория
 
@@ -225,13 +249,15 @@ vmalert/                    alerts.yml — правила алертов (PromQL
 alertmanager/               alertmanager.yml — группировка и маршрутизация уведомлений
 alertreceiver/              Go webhook-приёмник, печатает уведомления в stdout
 tempo/                      tempo.yaml — конфиг хранилища трейсов
+otel-collector/             otel-collector.yaml — приём OTLP → Tempo + service graph → VictoriaMetrics
 vector/                     vector.yaml — сборщик логов → VictoriaLogs
 grafana/                    provisioning датасорсов + готовый дашборд
 ```
 
 ## Известные ограничения
 
-- Образы VictoriaMetrics/VictoriaLogs/Tempo/Vector/Grafana взяты с тегом
+- Образы VictoriaMetrics/VictoriaLogs/Tempo/Vector/Grafana/OTel Collector/Mailpit
+  взяты с тегом
   `:latest` — для локального стенда это допустимо, но для воспроизводимой сборки стоит
   закрепить конкретные версии в `docker-compose.yml` под ваше окружение.
 - Один экземпляр каждого сервиса.

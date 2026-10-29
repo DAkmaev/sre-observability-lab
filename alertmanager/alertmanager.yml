@@ -1,37 +1,30 @@
-# Alertmanager: приём алертов от vmalert, дедупликация, группировка,
-# маршрутизация и отправка уведомлений в каналы оповещения.
-#
-# Для локального стенда уведомления дублируются в два канала:
-#   1) крошечный HTTP-сервис alertreceiver, который печатает каждое
-#      уведомление в stdout контейнера — его подбирает Vector и шлёт
-#      в VictoriaLogs (виден весь путь алерта без внешних сервисов);
-#   2) тестовый SMTP-сервер Mailpit (UI: http://localhost:8025), чтобы
-#      наглядно посмотреть, как выглядят письма.
-# Для реальной эксплуатации замените webhook-URL и smtp_smarthost на свои.
+# Каналы стенда: webhook alertreceiver (stdout -> Vector -> VictoriaLogs)
+# и Mailpit (UI: http://localhost:8025).
 
 global:
   resolve_timeout: 5m
-  # Тестовый SMTP-сервер Mailpit (см. docker-compose). TLS/auth не требует.
   smtp_smarthost: "mailpit:1025"
   smtp_from: "alertmanager@sre-lab"
   smtp_require_tls: false
 
-# Именованные шаблоны писем (рендер Subject и тела из .Alerts, а не GroupLabels,
-# чтобы были видны severity/availability и не зависеть от group_by).
 templates:
   - "/etc/alertmanager/template.tmpl"
 
 route:
-  # Группируем по имени алерта и сервису, чтобы не спамить одним инцидентом.
   group_by: ["alertname", "service"]
   group_wait: 10s
   group_interval: 30s
   repeat_interval: 2m
   receiver: "all-notifications"
+  routes:
+    # Heartbeat конвейера алертинга: не засоряем почту, но видим, что он жив.
+    - matchers: ['alertname="Watchdog"']
+      receiver: "watchdog"
+      group_wait: 0s
+      group_interval: 1m
+      repeat_interval: 1m
 
 receivers:
-  # Всё дублируется и в учебный webhook, и на тестовую почту Mailpit,
-  # чтобы студенты видели оба пути доставки уведомлений.
   - name: "all-notifications"
     webhook_configs:
       - url: "http://alertreceiver:9119/alert"
@@ -43,11 +36,21 @@ receivers:
           Subject: '{{ template "email.default.subject" . }}'
         html: '{{ template "email.default.html" . }}'
 
+  - name: "watchdog"
+    webhook_configs:
+      - url: "http://alertreceiver:9119/alert"
+        send_resolved: false
+
 inhibit_rules:
-  # Погасить менее конкретные алерты, если уже горит более серьёзный
-  # (например, не нужно 10 алертов, когда сервис целиком недоступен).
-  - source_matchers:
-      - service =~ "recommendations|payment"
-    target_matchers:
-      - availability =~ "High|Critical"
+  # 1. Если цель не скрейпится, остальные алерты этого сервиса бессмысленны
+  #    (метрик нет или они устарели): остаётся один корневой TargetDown.
+  - source_matchers: ['alertname="TargetDown"']
+    target_matchers: ['alertname!="TargetDown"']
     equal: ["service"]
+
+  # 2. Причина прячет следствие: упала зависимость (recommendations/payment) —
+  #    не показываем «circuit breaker / ретраи / bulkhead» для неё.
+  #    Связь по метке dependency (у TargetDown она равна job).
+  - source_matchers: ['alertname="TargetDown"']
+    target_matchers: ['alertname=~"CircuitBreakerOpen|RetriesExhausted|ManyBulkheadRejections"']
+    equal: ["dependency"]
