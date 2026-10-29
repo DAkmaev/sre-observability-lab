@@ -1,0 +1,56 @@
+# Каналы стенда: webhook alertreceiver (stdout -> Vector -> VictoriaLogs)
+# и Mailpit (UI: http://localhost:8025).
+
+global:
+  resolve_timeout: 5m
+  smtp_smarthost: "mailpit:1025"
+  smtp_from: "alertmanager@sre-lab"
+  smtp_require_tls: false
+
+templates:
+  - "/etc/alertmanager/template.tmpl"
+
+route:
+  group_by: ["alertname", "service"]
+  group_wait: 10s
+  group_interval: 30s
+  repeat_interval: 2m
+  receiver: "all-notifications"
+  routes:
+    # Heartbeat конвейера алертинга: не засоряем почту, но видим, что он жив.
+    - matchers: ['alertname="Watchdog"']
+      receiver: "watchdog"
+      group_wait: 0s
+      group_interval: 1m
+      repeat_interval: 1m
+
+receivers:
+  - name: "all-notifications"
+    webhook_configs:
+      - url: "http://alertreceiver:9119/alert"
+        send_resolved: true
+    email_configs:
+      - to: "sre-team@example.com"
+        send_resolved: true
+        headers:
+          Subject: '{{ template "email.default.subject" . }}'
+        html: '{{ template "email.default.html" . }}'
+
+  - name: "watchdog"
+    webhook_configs:
+      - url: "http://alertreceiver:9119/alert"
+        send_resolved: false
+
+inhibit_rules:
+  # 1. Если цель не скрейпится, остальные алерты этого сервиса бессмысленны
+  #    (метрик нет или они устарели): остаётся один корневой TargetDown.
+  - source_matchers: ['alertname="TargetDown"']
+    target_matchers: ['alertname!="TargetDown"']
+    equal: ["service"]
+
+  # 2. Причина прячет следствие: упала зависимость (recommendations/payment) —
+  #    не показываем «circuit breaker / ретраи / bulkhead» для неё.
+  #    Связь по метке dependency (у TargetDown она равна job).
+  - source_matchers: ['alertname="TargetDown"']
+    target_matchers: ['alertname=~"CircuitBreakerOpen|RetriesExhausted|ManyBulkheadRejections"']
+    equal: ["dependency"]

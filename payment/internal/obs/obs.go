@@ -6,9 +6,11 @@ package obs
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
+	"strconv"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -152,11 +154,12 @@ func Instrument(m *Metrics, logger *slog.Logger, method, route string, next http
 		duration := time.Since(start).Seconds()
 		status := rec.status
 
-		m.RequestsTotal.WithLabelValues(method, route, http.StatusText(status)).Inc()
+		m.RequestsTotal.WithLabelValues(method, route, strconv.Itoa(status)).Inc()
 		m.RequestDuration.WithLabelValues(method, route).Observe(duration)
 
 		log := WithTrace(r.Context(), logger)
-		log.Info("http_request",
+		log.Log(r.Context(), accessLevel(status),
+			fmt.Sprintf("%s %s -> %d %s", method, route, status, http.StatusText(status)),
 			"request_id", RequestIDFromContext(r.Context()),
 			"method", method,
 			"route", route,
@@ -166,4 +169,14 @@ func Instrument(m *Metrics, logger *slog.Logger, method, route string, next http
 			"remote_addr", r.RemoteAddr,
 		)
 	})
+}
+
+// accessLevel возвращает ERROR для клиентских/серверных ошибок (>=400) и
+// INFO для успешных запросов. Это позволяет панели "HTTP failures + корневая
+// причина" (и поиску по логам) находить ошибки по полю level, а не по статусу.
+func accessLevel(status int) slog.Level {
+	if status >= 400 {
+		return slog.LevelError
+	}
+	return slog.LevelInfo
 }

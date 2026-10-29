@@ -28,3 +28,11 @@ scrape_configs:
       - targets: ["payment:8083"]
         labels:
           service: payment
+
+  # Вспомогательный сервис: приёмник уведомлений Alertmanager. Тоже скрейпим,
+  # чтобы следить за его доступностью (up{job="alertreceiver"}).
+  - job_name: alertreceiver
+    static_configs:
+      - targets: ["alertreceiver:9119"]
+        labels:
+          service: alertreceiver

@@ -6,9 +6,11 @@ package obs
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -153,11 +155,13 @@ func Instrument(m *Metrics, logger *slog.Logger, method, route string, next http
 		duration := time.Since(start).Seconds()
 		status := rec.status
 
-		m.RequestsTotal.WithLabelValues(method, route, http.StatusText(status)).Inc()
+		m.RequestsTotal.WithLabelValues(method, route, strconv.Itoa(status)).Inc()
 		m.RequestDuration.WithLabelValues(method, route).Observe(duration)
 
 		log := WithTrace(r.Context(), logger)
-		log.Info("http_request",
+		level := accessLevel(status)
+		log.Log(r.Context(), level,
+			fmt.Sprintf("%s %s -> %d %s", method, route, status, http.StatusText(status)),
 			"request_id", RequestIDFromContext(r.Context()),
 			"method", method,
 			"route", route,
@@ -167,6 +171,16 @@ func Instrument(m *Metrics, logger *slog.Logger, method, route string, next http
 			"remote_addr", r.RemoteAddr,
 		)
 	})
+}
+
+// accessLevel возвращает ERROR для клиентских/серверных ошибок (>=400) и
+// INFO для успешных запросов. Это позволяет панели "HTTP failures + корневая
+// причина" (и поиску по логам) находить ошибки по полю level, а не по статусу.
+func accessLevel(status int) slog.Level {
+	if status >= 400 {
+		return slog.LevelError
+	}
+	return slog.LevelInfo
 }
 
 // InstrumentServer собирает RED для backend, где маршруты объявлены в
@@ -187,7 +201,7 @@ func InstrumentServer(m *Metrics, logger *slog.Logger, next http.Handler) http.H
 		} else if strings.HasPrefix(route, "/api/products/") {
 			route = "/api/products/:id"
 		}
-		m.RequestsTotal.WithLabelValues(r.Method, route, http.StatusText(rec.status)).Inc()
+		m.RequestsTotal.WithLabelValues(r.Method, route, strconv.Itoa(rec.status)).Inc()
 		m.RequestDuration.WithLabelValues(r.Method, route).Observe(time.Since(start).Seconds())
 
 		log := WithTrace(r.Context(), logger).With(
@@ -200,6 +214,7 @@ func InstrumentServer(m *Metrics, logger *slog.Logger, next http.Handler) http.H
 		if u, ok := UserFromContext(r.Context()); ok {
 			log = log.With("user_id", u.ID, "user_role", u.Role)
 		}
-		log.Info("http_request")
+		log.Log(r.Context(), accessLevel(rec.status),
+			fmt.Sprintf("%s %s -> %d %s", r.Method, route, rec.status, http.StatusText(rec.status)))
 	})
 }

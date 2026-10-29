@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 )
 
 func TestSessionStoreCreateGetDeleteActiveCount(t *testing.T) {
@@ -54,6 +55,63 @@ func TestSessionStoreTokensUnique(t *testing.T) {
 	b := store.Create(User{ID: 2, Name: "b", Role: "user"})
 	if a == b {
 		t.Fatal("tokens must be unique")
+	}
+}
+
+func TestSessionStoreExpires(t *testing.T) {
+	var notified int
+	store := SessionStore(func(n int) { notified = n })
+
+	token := store.Create(User{ID: 1, Name: "alice", Role: "user"})
+	if notified != 1 {
+		t.Fatalf("expected 1 active session callback, got %d", notified)
+	}
+
+	// Продлеваем жизнь сессии — Get в пределах TTL должен работать.
+	if _, ok := store.Get(token); !ok {
+		t.Fatal("fresh session must resolve via Get")
+	}
+
+	// Просрочиваем сессию вручную и проверяем, что Get её не возвращает.
+	sess := store.getSession(token)
+	sess.ExpiresAt = time.Now().Add(-time.Minute)
+	store.sessions.Store(token, sess)
+
+	if _, ok := store.Get(token); ok {
+		t.Fatal("expired session must not resolve via Get")
+	}
+	if store.ActiveCount() != 0 {
+		t.Fatalf("ActiveCount = %d, want 0 after expiry", store.ActiveCount())
+	}
+	if notified != 0 {
+		t.Fatalf("expected gauge notified to 0 after expiry, got %d", notified)
+	}
+}
+
+func TestSessionStoreSweepExpired(t *testing.T) {
+	var notified int
+	store := SessionStore(func(n int) { notified = n })
+
+	live := store.Create(User{ID: 1, Name: "alice", Role: "user"})
+	stale := store.Create(User{ID: 2, Name: "bob", Role: "user"})
+	if notified != 2 {
+		t.Fatalf("expected 2 active sessions callback, got %d", notified)
+	}
+
+	sess := store.getSession(stale)
+	sess.ExpiresAt = time.Now().Add(-time.Minute)
+	store.sessions.Store(stale, sess)
+
+	store.SweepExpired()
+
+	if store.ActiveCount() != 1 {
+		t.Fatalf("ActiveCount = %d, want 1 after sweep", store.ActiveCount())
+	}
+	if _, ok := store.Get(live); !ok {
+		t.Fatal("live session must survive sweep")
+	}
+	if notified != 1 {
+		t.Fatalf("expected gauge notified to 1 after sweep, got %d", notified)
 	}
 }
 
@@ -110,4 +168,11 @@ func TestUserFromContextMissing(t *testing.T) {
 	case true:
 		t.Fatal("expected ok=false for empty context")
 	}
+}
+
+// getSession возвращает хранимую сессию напрямую (минуя продление Get)
+// для тестов истечения срока жизни.
+func (s *sessionStore) getSession(token string) Session {
+	v, _ := s.sessions.Load(token)
+	return v.(Session)
 }

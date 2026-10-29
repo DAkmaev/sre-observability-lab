@@ -19,7 +19,12 @@
       "title": "🔴 Circuit Breaker Story — recommendations",
       "type": "row",
       "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
       "panels": []
     },
     {
@@ -27,24 +32,65 @@
       "title": "CB state (сейчас)",
       "description": "0 = closed (норма) · 1 = half-open (пробуем восстановиться) · 2 = open (зависимость отключена, работаем в degraded-режиме)",
       "type": "stat",
-      "datasource": { "type": "victoriametrics-metrics-datasource", "uid": "vm-metrics" },
-      "gridPos": { "h": 7, "w": 4, "x": 0, "y": 1 },
+      "datasource": {
+        "type": "victoriametrics-metrics-datasource",
+        "uid": "vm-metrics"
+      },
+      "gridPos": {
+        "h": 3,
+        "w": 4,
+        "x": 0,
+        "y": 1
+      },
       "targets": [
-        { "expr": "backend_circuit_breaker_state", "legendFormat": "state" }
+        {
+          "expr": "backend_circuit_breaker_state",
+          "legendFormat": "state"
+        }
       ],
       "fieldConfig": {
         "defaults": {
           "mappings": [
-            { "type": "value", "options": { "0": { "text": "CLOSED" } } },
-            { "type": "value", "options": { "1": { "text": "HALF-OPEN" } } },
-            { "type": "value", "options": { "2": { "text": "OPEN" } } }
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "CLOSED"
+                }
+              }
+            },
+            {
+              "type": "value",
+              "options": {
+                "1": {
+                  "text": "HALF-OPEN"
+                }
+              }
+            },
+            {
+              "type": "value",
+              "options": {
+                "2": {
+                  "text": "OPEN"
+                }
+              }
+            }
           ],
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "green", "value": null },
-              { "color": "yellow", "value": 1 },
-              { "color": "red", "value": 2 }
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 1
+              },
+              {
+                "color": "red",
+                "value": 2
+              }
             ]
           }
         },
@@ -53,52 +99,184 @@
     },
     {
       "id": 101,
-      "title": "CB state во времени (когда именно размыкалась цепь)",
+      "title": "CB state во времени",
       "description": "Полосы по времени: зелёная = CLOSED, жёлтая = HALF-OPEN, красная = OPEN. Сравните с графиком трафика recommendations ниже — под красными полосами трафик должен падать в ноль.",
       "type": "state-timeline",
-      "datasource": { "type": "victoriametrics-metrics-datasource", "uid": "vm-metrics" },
-      "gridPos": { "h": 7, "w": 20, "x": 4, "y": 1 },
+      "datasource": {
+        "type": "victoriametrics-metrics-datasource",
+        "uid": "vm-metrics"
+      },
+      "gridPos": {
+        "h": 3,
+        "w": 20,
+        "x": 4,
+        "y": 1
+      },
       "targets": [
-        { "expr": "backend_circuit_breaker_state", "legendFormat": "CB state" }
+        {
+          "expr": "backend_circuit_breaker_state",
+          "legendFormat": "CB state"
+        }
       ],
       "fieldConfig": {
         "defaults": {
           "mappings": [
-            { "type": "value", "options": { "0": { "text": "CLOSED", "color": "green" } } },
-            { "type": "value", "options": { "1": { "text": "HALF-OPEN", "color": "yellow" } } },
-            { "type": "value", "options": { "2": { "text": "OPEN", "color": "red" } } }
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "CLOSED",
+                  "color": "#1f3d2b",
+                  "index": 0
+                }
+              }
+            },
+            {
+              "type": "value",
+              "options": {
+                "1": {
+                  "text": "HALF-OPEN",
+                  "color": "#e0b400",
+                  "index": 1
+                }
+              }
+            },
+            {
+              "type": "value",
+              "options": {
+                "2": {
+                  "text": "OPEN",
+                  "color": "#e02f44",
+                  "index": 2
+                }
+              }
+            }
           ],
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "green", "value": null },
-              { "color": "yellow", "value": 1 },
-              { "color": "red", "value": 2 }
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 1
+              },
+              {
+                "color": "red",
+                "value": 2
+              }
             ]
+          },
+          "custom": {
+            "fillOpacity": 85,
+            "lineWidth": 0
           }
         },
         "overrides": []
       },
       "options": {
         "mergeValues": true,
-        "showValue": "always",
-        "rowHeight": 0.9,
-        "alignValue": "left"
+        "showValue": "never",
+        "rowHeight": 0.5,
+        "alignValue": "left",
+        "legend": {
+          "showLegend": false
+        },
+        "tooltip": {
+          "mode": "single"
+        }
       }
     },
     {
       "id": 5,
-      "title": "Recommendations — Rate (сюда смотреть при OPEN)",
+      "title": "Recommendations — Rate (красные полосы = CB OPEN)",
       "description": "Реальный трафик, дошедший до сервиса recommendations. Совместите глазами с полосами CB state выше: во время OPEN здесь должен быть провал в ноль.",
       "type": "timeseries",
-      "datasource": { "type": "victoriametrics-metrics-datasource", "uid": "vm-metrics" },
-      "gridPos": { "h": 7, "w": 24, "x": 0, "y": 8 },
+      "datasource": {
+        "type": "victoriametrics-metrics-datasource",
+        "uid": "vm-metrics"
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 24,
+        "x": 0,
+        "y": 4
+      },
       "targets": [
-        { "expr": "sum(rate(recommendations_http_requests_total[1m])) by (status)", "legendFormat": "{{status}}" }
+        {
+          "expr": "sum(rate(recommendations_http_requests_total[1m])) by (status)",
+          "legendFormat": "{{status}}",
+          "refId": "A"
+        },
+        {
+          "expr": "backend_circuit_breaker_state == bool 2",
+          "legendFormat": "CB OPEN",
+          "refId": "B"
+        }
       ],
       "fieldConfig": {
-        "defaults": { "unit": "reqps" },
-        "overrides": []
+        "defaults": {
+          "unit": "reqps"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "CB OPEN"
+            },
+            "properties": [
+              {
+                "id": "custom.drawStyle",
+                "value": "bars"
+              },
+              {
+                "id": "custom.fillOpacity",
+                "value": 18
+              },
+              {
+                "id": "custom.lineWidth",
+                "value": 0
+              },
+              {
+                "id": "custom.barAlignment",
+                "value": 0
+              },
+              {
+                "id": "custom.axisPlacement",
+                "value": "hidden"
+              },
+              {
+                "id": "custom.hideFrom",
+                "value": {
+                  "legend": true,
+                  "tooltip": true,
+                  "viz": false
+                }
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "red"
+                }
+              },
+              {
+                "id": "unit",
+                "value": "short"
+              },
+              {
+                "id": "min",
+                "value": 0
+              },
+              {
+                "id": "max",
+                "value": 1
+              }
+            ]
+          }
+        ]
       }
     },
     {
@@ -106,155 +284,461 @@
       "title": "Product card (/api/products/:id) — graceful degradation",
       "description": "В graceful backend отдаёт 200 и товар без рекомендаций, даже когда breaker OPEN и трафик к recommendations на панели выше упал в ноль. В strict-режиме здесь появится 429/5xx.",
       "type": "timeseries",
-      "datasource": { "type": "victoriametrics-metrics-datasource", "uid": "vm-metrics" },
-      "gridPos": { "h": 7, "w": 24, "x": 0, "y": 15 },
+      "datasource": {
+        "type": "victoriametrics-metrics-datasource",
+        "uid": "vm-metrics"
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 24,
+        "x": 0,
+        "y": 11
+      },
       "targets": [
-        { "expr": "sum(rate(backend_http_requests_total{route=\"/api/products/:id\"}[1m])) by (status)", "legendFormat": "{{status}}" }
+        {
+          "expr": "sum(rate(backend_http_requests_total{route=\"/api/products/:id\"}[1m])) by (status)",
+          "legendFormat": "{{status}}"
+        }
       ],
       "fieldConfig": {
-        "defaults": { "unit": "reqps" },
+        "defaults": {
+          "unit": "reqps"
+        },
         "overrides": []
       }
     },
-
     {
       "id": 110,
       "title": "📦 Recommendations service (RED)",
       "type": "row",
       "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 22 },
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 18
+      },
       "panels": []
     },
     {
       "id": 5001,
       "title": "Recommendations — Rate",
       "type": "timeseries",
-      "datasource": { "type": "victoriametrics-metrics-datasource", "uid": "vm-metrics" },
-      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 23 },
+      "datasource": {
+        "type": "victoriametrics-metrics-datasource",
+        "uid": "vm-metrics"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 19
+      },
       "targets": [
-        { "expr": "sum(rate(recommendations_http_requests_total[1m])) by (status)", "legendFormat": "{{status}}" }
+        {
+          "expr": "sum(rate(recommendations_http_requests_total[1m])) by (status)",
+          "legendFormat": "{{status}}"
+        }
       ],
-      "fieldConfig": { "defaults": { "unit": "reqps" }, "overrides": [] }
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps"
+        },
+        "overrides": []
+      }
     },
     {
       "id": 6,
       "title": "Recommendations — Errors",
       "type": "timeseries",
-      "datasource": { "type": "victoriametrics-metrics-datasource", "uid": "vm-metrics" },
-      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 23 },
+      "datasource": {
+        "type": "victoriametrics-metrics-datasource",
+        "uid": "vm-metrics"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 8,
+        "y": 19
+      },
       "targets": [
-        { "expr": "sum(rate(recommendations_http_requests_total{status!=\"OK\"}[1m])) by (status)", "legendFormat": "{{status}}" }
+        {
+          "expr": "sum(rate(recommendations_http_requests_total{status!~\"2.*\"}[1m])) by (status)",
+          "legendFormat": "{{status}}"
+        }
       ],
-      "fieldConfig": { "defaults": { "unit": "reqps" }, "overrides": [] }
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps"
+        },
+        "overrides": []
+      }
     },
     {
       "id": 7,
       "title": "Recommendations — Duration p95",
       "type": "timeseries",
-      "datasource": { "type": "victoriametrics-metrics-datasource", "uid": "vm-metrics" },
-      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 23 },
+      "datasource": {
+        "type": "victoriametrics-metrics-datasource",
+        "uid": "vm-metrics"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 19
+      },
       "targets": [
-        { "expr": "histogram_quantile(0.95, sum(rate(recommendations_http_request_duration_seconds_bucket[5m])) by (le))", "legendFormat": "p95" }
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(recommendations_http_request_duration_seconds_bucket[5m])) by (le))",
+          "legendFormat": "p95"
+        }
       ],
-      "fieldConfig": { "defaults": { "unit": "s" }, "overrides": [] }
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        },
+        "overrides": []
+      }
     },
     {
       "id": 13,
       "title": "Recommendations — Rate limit (429 / сек)",
       "description": "429 — защитный ответ от перегрузки. Он не должен открывать circuit breaker: backend отличает rate limit от технической ошибки зависимости.",
       "type": "timeseries",
-      "datasource": { "type": "victoriametrics-metrics-datasource", "uid": "vm-metrics" },
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 31 },
+      "datasource": {
+        "type": "victoriametrics-metrics-datasource",
+        "uid": "vm-metrics"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 27
+      },
       "targets": [
-        { "expr": "sum(rate(recommendations_rate_limit_rejections_total[1m]))", "legendFormat": "rejected" },
-        { "expr": "recommendations_rate_limit_requests_per_second", "legendFormat": "configured RPS" }
+        {
+          "expr": "sum(rate(recommendations_rate_limit_rejections_total[1m]))",
+          "legendFormat": "rejected"
+        },
+        {
+          "expr": "recommendations_rate_limit_requests_per_second",
+          "legendFormat": "configured RPS"
+        }
       ],
-      "fieldConfig": { "defaults": { "unit": "ops" }, "overrides": [] }
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops"
+        },
+        "overrides": []
+      }
     },
     {
       "id": 24,
       "title": "Recommendations — получено запросов за 5м (bars, когда OPEN — баров нет)",
       "description": "Столбики = сколько запросов реально дошло до сервиса recommendations за последние 5 минут, по status. При CB OPEN backend вообще перестаёт ходить к сервису — новых столбиков нет.",
       "type": "barchart",
-      "datasource": { "type": "victoriametrics-metrics-datasource", "uid": "vm-metrics" },
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 31 },
+      "datasource": {
+        "type": "victoriametrics-metrics-datasource",
+        "uid": "vm-metrics"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 27
+      },
       "targets": [
-        { "expr": "sum(increase(recommendations_http_requests_total[5m])) by (status)", "legendFormat": "{{status}}" }
+        {
+          "expr": "sum(increase(recommendations_http_requests_total[5m])) by (status)",
+          "legendFormat": "{{status}}"
+        }
       ],
-      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] }
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      }
     },
-
+    {
+      "id": 25,
+      "title": "Recommendations — Duration heatmap",
+      "description": "Распределение длительностей ответов recommendations по времени. Следите, как при CB OPEN советов нет вовсе (пустой heatmap), а в degraded/перегруженном режиме длительности уползают вправо.",
+      "type": "heatmap",
+      "datasource": {
+        "type": "victoriametrics-metrics-datasource",
+        "uid": "vm-metrics"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 35
+      },
+      "targets": [
+        {
+          "expr": "sort_by_label_numeric(sum(rate(recommendations_http_request_duration_seconds_bucket[5m])) by (le), \"le\")",
+          "legendFormat": "le {{le}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": {}
+        },
+        "overrides": []
+      },
+      "options": {
+        "calculate": false,
+        "color": {
+          "mode": "scheme",
+          "scheme": "Oranges",
+          "steps": 64
+        },
+        "cellGap": 1,
+        "yAxis": {
+          "axisPlacement": "left",
+          "min": 0,
+          "max": 10,
+          "reverse": false,
+          "unit": "s"
+        },
+        "xAxis": {
+          "axisPlacement": "top",
+          "show": true
+        },
+        "legend": {
+          "show": true,
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "show": true,
+          "yHistogram": true
+        }
+      }
+    },
     {
       "id": 120,
       "title": "🧾 Backend / Checkout (RED)",
       "type": "row",
       "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 39 },
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 43
+      },
       "panels": []
     },
     {
       "id": 1,
       "title": "Backend — Rate (запросов/сек по route)",
       "type": "timeseries",
-      "datasource": { "type": "victoriametrics-metrics-datasource", "uid": "vm-metrics" },
-      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 40 },
+      "datasource": {
+        "type": "victoriametrics-metrics-datasource",
+        "uid": "vm-metrics"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 44
+      },
       "targets": [
-        { "expr": "sum(rate(backend_http_requests_total[1m])) by (route)", "legendFormat": "{{route}}" }
+        {
+          "expr": "sum(rate(backend_http_requests_total[1m])) by (route)",
+          "legendFormat": "{{route}}"
+        }
       ],
-      "fieldConfig": { "defaults": { "unit": "reqps" }, "overrides": [] }
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps"
+        },
+        "overrides": []
+      }
     },
     {
       "id": 2,
       "title": "Backend — Errors (доля не-200 ответов)",
       "type": "timeseries",
-      "datasource": { "type": "victoriametrics-metrics-datasource", "uid": "vm-metrics" },
-      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 40 },
+      "datasource": {
+        "type": "victoriametrics-metrics-datasource",
+        "uid": "vm-metrics"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 8,
+        "y": 44
+      },
       "targets": [
-        { "expr": "sum(rate(backend_http_requests_total{status!=\"OK\"}[1m])) by (route, status)", "legendFormat": "{{route}} — {{status}}" }
+        {
+          "expr": "sum(rate(backend_http_requests_total{status!~\"2.*\"}[1m])) by (route, status)",
+          "legendFormat": "{{route}} — {{status}}"
+        }
       ],
-      "fieldConfig": { "defaults": { "unit": "reqps" }, "overrides": [] }
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps"
+        },
+        "overrides": []
+      }
     },
     {
       "id": 3,
       "title": "Backend — Duration p95",
       "type": "timeseries",
-      "datasource": { "type": "victoriametrics-metrics-datasource", "uid": "vm-metrics" },
-      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 40 },
+      "datasource": {
+        "type": "victoriametrics-metrics-datasource",
+        "uid": "vm-metrics"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 44
+      },
       "targets": [
-        { "expr": "histogram_quantile(0.95, sum(rate(backend_http_request_duration_seconds_bucket[5m])) by (le, route))", "legendFormat": "p95 {{route}}" }
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(backend_http_request_duration_seconds_bucket[5m])) by (le, route))",
+          "legendFormat": "p95 {{route}}"
+        }
       ],
-      "fieldConfig": { "defaults": { "unit": "s" }, "overrides": [] }
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        },
+        "overrides": []
+      }
     },
     {
       "id": 8,
       "title": "Checkout (POST /api/orders) — Rate & Errors",
       "description": "Обратите внимание: неудачная оплата (карта отклонена или payment деградировал) отвечает HTTP 402, а не 5xx — заказ создаётся в любом случае.",
       "type": "timeseries",
-      "datasource": { "type": "victoriametrics-metrics-datasource", "uid": "vm-metrics" },
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 48 },
+      "datasource": {
+        "type": "victoriametrics-metrics-datasource",
+        "uid": "vm-metrics"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 52
+      },
       "targets": [
-        { "expr": "sum(rate(backend_http_requests_total{route=\"/api/orders\"}[1m])) by (status)", "legendFormat": "{{status}}" }
+        {
+          "expr": "sum(rate(backend_http_requests_total{route=\"/api/orders\"}[1m])) by (status)",
+          "legendFormat": "{{status}}"
+        }
       ],
-      "fieldConfig": { "defaults": { "unit": "reqps" }, "overrides": [] }
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps"
+        },
+        "overrides": []
+      }
     },
     {
       "id": 9,
       "title": "Checkout — Duration p95",
       "type": "timeseries",
-      "datasource": { "type": "victoriametrics-metrics-datasource", "uid": "vm-metrics" },
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 48 },
+      "datasource": {
+        "type": "victoriametrics-metrics-datasource",
+        "uid": "vm-metrics"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 52
+      },
       "targets": [
-        { "expr": "histogram_quantile(0.95, sum(rate(backend_http_request_duration_seconds_bucket{route=\"/api/orders\"}[5m])) by (le))", "legendFormat": "p95" }
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(backend_http_request_duration_seconds_bucket{route=\"/api/orders\"}[5m])) by (le))",
+          "legendFormat": "p95"
+        }
       ],
-      "fieldConfig": { "defaults": { "unit": "s" }, "overrides": [] }
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        },
+        "overrides": []
+      }
     },
-
+    {
+      "id": 26,
+      "title": "Backend — Duration heatmap (по route)",
+      "description": "Распределение длительностей ответов backend (все routes). Хвост вправо = медленные зависимости (recommendations при CLOSED/HALF-OPEN, payment и т.д.).",
+      "type": "heatmap",
+      "datasource": {
+        "type": "victoriametrics-metrics-datasource",
+        "uid": "vm-metrics"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 60
+      },
+      "targets": [
+        {
+          "expr": "sort_by_label_numeric(sum(rate(backend_http_request_duration_seconds_bucket[5m])) by (le), \"le\")",
+          "legendFormat": "le {{le}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": {}
+        },
+        "overrides": []
+      },
+      "options": {
+        "calculate": false,
+        "color": {
+          "mode": "scheme",
+          "scheme": "Oranges",
+          "steps": 64
+        },
+        "cellGap": 1,
+        "yAxis": {
+          "axisPlacement": "left",
+          "min": 0,
+          "max": 10,
+          "reverse": false,
+          "unit": "s"
+        },
+        "xAxis": {
+          "axisPlacement": "top",
+          "show": true
+        },
+        "legend": {
+          "show": true,
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "show": true,
+          "yHistogram": true
+        }
+      }
+    },
     {
       "id": 130,
       "title": "💳 Payment service (RED) + Circuit Breaker",
       "type": "row",
       "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 56 },
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 68
+      },
       "panels": []
     },
     {
@@ -262,24 +746,65 @@
       "title": "CB: backend → payment",
       "description": "0 = closed (норма) · 1 = half-open · 2 = open. Отдельный breaker от recommendations — падение оплаты не должно размыкать цепь рекомендаций и наоборот.",
       "type": "stat",
-      "datasource": { "type": "victoriametrics-metrics-datasource", "uid": "vm-metrics" },
-      "gridPos": { "h": 8, "w": 6, "x": 0, "y": 57 },
+      "datasource": {
+        "type": "victoriametrics-metrics-datasource",
+        "uid": "vm-metrics"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 6,
+        "x": 0,
+        "y": 69
+      },
       "targets": [
-        { "expr": "backend_payment_circuit_breaker_state", "legendFormat": "state" }
+        {
+          "expr": "backend_payment_circuit_breaker_state",
+          "legendFormat": "state"
+        }
       ],
       "fieldConfig": {
         "defaults": {
           "mappings": [
-            { "type": "value", "options": { "0": { "text": "CLOSED" } } },
-            { "type": "value", "options": { "1": { "text": "HALF-OPEN" } } },
-            { "type": "value", "options": { "2": { "text": "OPEN" } } }
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "CLOSED"
+                }
+              }
+            },
+            {
+              "type": "value",
+              "options": {
+                "1": {
+                  "text": "HALF-OPEN"
+                }
+              }
+            },
+            {
+              "type": "value",
+              "options": {
+                "2": {
+                  "text": "OPEN"
+                }
+              }
+            }
           ],
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "green", "value": null },
-              { "color": "yellow", "value": 1 },
-              { "color": "red", "value": 2 }
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 1
+              },
+              {
+                "color": "red",
+                "value": 2
+              }
             ]
           }
         },
@@ -290,31 +815,126 @@
       "id": 11,
       "title": "Payment — Rate & Errors",
       "type": "timeseries",
-      "datasource": { "type": "victoriametrics-metrics-datasource", "uid": "vm-metrics" },
-      "gridPos": { "h": 8, "w": 9, "x": 6, "y": 57 },
+      "datasource": {
+        "type": "victoriametrics-metrics-datasource",
+        "uid": "vm-metrics"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 9,
+        "x": 6,
+        "y": 69
+      },
       "targets": [
-        { "expr": "sum(rate(payment_http_requests_total[1m])) by (status)", "legendFormat": "{{status}}" }
+        {
+          "expr": "sum(rate(payment_http_requests_total[1m])) by (status)",
+          "legendFormat": "{{status}}"
+        }
       ],
-      "fieldConfig": { "defaults": { "unit": "reqps" }, "overrides": [] }
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps"
+        },
+        "overrides": []
+      }
     },
     {
       "id": 12,
       "title": "Payment — Duration p95 (сравните с bank.authorize / payments.persist в трейсах)",
       "type": "timeseries",
-      "datasource": { "type": "victoriametrics-metrics-datasource", "uid": "vm-metrics" },
-      "gridPos": { "h": 8, "w": 9, "x": 15, "y": 57 },
+      "datasource": {
+        "type": "victoriametrics-metrics-datasource",
+        "uid": "vm-metrics"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 9,
+        "x": 15,
+        "y": 69
+      },
       "targets": [
-        { "expr": "histogram_quantile(0.95, sum(rate(payment_http_request_duration_seconds_bucket[5m])) by (le))", "legendFormat": "p95" }
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(payment_http_request_duration_seconds_bucket[5m])) by (le))",
+          "legendFormat": "p95"
+        }
       ],
-      "fieldConfig": { "defaults": { "unit": "s" }, "overrides": [] }
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        },
+        "overrides": []
+      }
     },
-
+    {
+      "id": 27,
+      "title": "Payment — Duration heatmap",
+      "description": "Распределение длительностей ответов payment. Если payment деградирует, виден медленный хвост; краткие выбросы = первая попытка + retry.",
+      "type": "heatmap",
+      "datasource": {
+        "type": "victoriametrics-metrics-datasource",
+        "uid": "vm-metrics"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 77
+      },
+      "targets": [
+        {
+          "expr": "sort_by_label_numeric(sum(rate(payment_http_request_duration_seconds_bucket[5m])) by (le), \"le\")",
+          "legendFormat": "le {{le}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": {}
+        },
+        "overrides": []
+      },
+      "options": {
+        "calculate": false,
+        "color": {
+          "mode": "scheme",
+          "scheme": "Oranges",
+          "steps": 64
+        },
+        "cellGap": 1,
+        "yAxis": {
+          "axisPlacement": "left",
+          "min": 0,
+          "max": 10,
+          "reverse": false,
+          "unit": "s"
+        },
+        "xAxis": {
+          "axisPlacement": "top",
+          "show": true
+        },
+        "legend": {
+          "show": true,
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "show": true,
+          "yHistogram": true
+        }
+      }
+    },
     {
       "id": 140,
       "title": "🛡 Resilience patterns",
       "type": "row",
       "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 65 },
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 85
+      },
       "panels": []
     },
     {
@@ -322,57 +942,128 @@
       "title": "Retry — повторы",
       "description": "Повторные попытки запроса зависимостей при временных сбоях (5xx/сеть) с экспоненциальной задержкой. Рост retries и exhausted — признак flaky-зависимости, которую выхаживает retry вместо грубого 5xx.",
       "type": "timeseries",
-      "datasource": { "type": "victoriametrics-metrics-datasource", "uid": "vm-metrics" },
-      "gridPos": { "h": 8, "w": 6, "x": 0, "y": 66 },
+      "datasource": {
+        "type": "victoriametrics-metrics-datasource",
+        "uid": "vm-metrics"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 6,
+        "x": 0,
+        "y": 86
+      },
       "targets": [
-        { "expr": "sum by (dependency) (rate(backend_resilience_retries_total[1m]))", "legendFormat": "{{dependency}} retries" },
-        { "expr": "sum by (dependency) (rate(backend_resilience_retry_exhausted_total[1m]))", "legendFormat": "{{dependency}} exhausted" }
+        {
+          "expr": "sum by (dependency) (rate(backend_resilience_retries_total[1m]))",
+          "legendFormat": "{{dependency}} retries"
+        },
+        {
+          "expr": "sum by (dependency) (rate(backend_resilience_retry_exhausted_total[1m]))",
+          "legendFormat": "{{dependency}} exhausted"
+        }
       ],
-      "fieldConfig": { "defaults": { "unit": "ops" }, "overrides": [] }
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops"
+        },
+        "overrides": []
+      }
     },
     {
       "id": 21,
       "title": "Timeout — таймауты зависимостей",
       "description": "Сколько раз запрос к зависимости не уложился в настроенный таймаут и был прерван, чтобы не ждать бесконечно.",
       "type": "timeseries",
-      "datasource": { "type": "victoriametrics-metrics-datasource", "uid": "vm-metrics" },
-      "gridPos": { "h": 8, "w": 6, "x": 6, "y": 66 },
+      "datasource": {
+        "type": "victoriametrics-metrics-datasource",
+        "uid": "vm-metrics"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 6,
+        "x": 6,
+        "y": 86
+      },
       "targets": [
-        { "expr": "sum by (dependency) (rate(backend_resilience_timeout_exceeded_total[1m]))", "legendFormat": "{{dependency}} timeout" }
+        {
+          "expr": "sum by (dependency) (rate(backend_resilience_timeout_exceeded_total[1m]))",
+          "legendFormat": "{{dependency}} timeout"
+        }
       ],
-      "fieldConfig": { "defaults": { "unit": "ops" }, "overrides": [] }
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops"
+        },
+        "overrides": []
+      }
     },
     {
       "id": 22,
       "title": "Bulkhead — отказы перегородки",
       "description": "Сколько запросов к зависимости отклонено перегородкой (fail fast), потому что все изолированные слоты заняты. Защита от каскадных сбоев.",
       "type": "timeseries",
-      "datasource": { "type": "victoriametrics-metrics-datasource", "uid": "vm-metrics" },
-      "gridPos": { "h": 8, "w": 6, "x": 12, "y": 66 },
+      "datasource": {
+        "type": "victoriametrics-metrics-datasource",
+        "uid": "vm-metrics"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 6,
+        "x": 12,
+        "y": 86
+      },
       "targets": [
-        { "expr": "sum by (dependency) (rate(backend_resilience_bulkhead_rejections_total[1m]))", "legendFormat": "{{dependency}} rejected" }
+        {
+          "expr": "sum by (dependency) (rate(backend_resilience_bulkhead_rejections_total[1m]))",
+          "legendFormat": "{{dependency}} rejected"
+        }
       ],
-      "fieldConfig": { "defaults": { "unit": "ops" }, "overrides": [] }
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops"
+        },
+        "overrides": []
+      }
     },
     {
       "id": 23,
       "title": "Fallback — кэш последнего успеха",
       "description": "Сколько раз вместо упавшей зависимости отдан кэш последнего успешного результата (деградация до запасного пути, а не ошибка).",
       "type": "timeseries",
-      "datasource": { "type": "victoriametrics-metrics-datasource", "uid": "vm-metrics" },
-      "gridPos": { "h": 8, "w": 6, "x": 18, "y": 66 },
+      "datasource": {
+        "type": "victoriametrics-metrics-datasource",
+        "uid": "vm-metrics"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 6,
+        "x": 18,
+        "y": 86
+      },
       "targets": [
-        { "expr": "sum by (dependency) (rate(backend_resilience_fallback_hits_total[1m]))", "legendFormat": "{{dependency}} hits" }
+        {
+          "expr": "sum by (dependency) (rate(backend_resilience_fallback_hits_total[1m]))",
+          "legendFormat": "{{dependency}} hits"
+        }
       ],
-      "fieldConfig": { "defaults": { "unit": "ops" }, "overrides": [] }
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops"
+        },
+        "overrides": []
+      }
     },
-
     {
       "id": 150,
       "title": "👤 Пользователи и сессии",
       "type": "row",
       "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 75 },
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 94
+      },
       "panels": []
     },
     {
@@ -380,44 +1071,96 @@
       "title": "Входы (rate)",
       "description": "Бизнес-метрика входов в лабу (вход по имени без пароля).",
       "type": "timeseries",
-      "datasource": { "type": "victoriametrics-metrics-datasource", "uid": "vm-metrics" },
-      "gridPos": { "h": 6, "w": 8, "x": 0, "y": 76 },
+      "datasource": {
+        "type": "victoriametrics-metrics-datasource",
+        "uid": "vm-metrics"
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 8,
+        "x": 0,
+        "y": 95
+      },
       "targets": [
-        { "expr": "sum(rate(backend_user_logins_total[1m]))", "legendFormat": "logins" }
+        {
+          "expr": "sum(rate(backend_user_logins_total[1m]))",
+          "legendFormat": "logins"
+        }
       ],
-      "fieldConfig": { "defaults": { "unit": "ops" }, "overrides": [] }
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops"
+        },
+        "overrides": []
+      }
     },
     {
       "id": 152,
       "title": "Активные сессии",
-      "description": "Gauge числа активных in-memory сессий backend.",
+      "description": "Gauge числа активных посетителей: сессия создаётся при первом запросе клиента (анонимный cookie) и живёт, пока он шлёт запросы (TTL 10с). Не зависит от входа в систему.",
       "type": "stat",
-      "datasource": { "type": "victoriametrics-metrics-datasource", "uid": "vm-metrics" },
-      "gridPos": { "h": 6, "w": 8, "x": 8, "y": 76 },
+      "datasource": {
+        "type": "victoriametrics-metrics-datasource",
+        "uid": "vm-metrics"
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 8,
+        "x": 8,
+        "y": 95
+      },
       "targets": [
-        { "expr": "backend_active_sessions", "legendFormat": "sessions" }
+        {
+          "expr": "backend_active_sessions",
+          "legendFormat": "sessions"
+        }
       ],
-      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] }
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      }
     },
     {
       "id": 153,
       "title": "Отказы доступа к админке (rate)",
       "description": "401 (нет сессии) / 403 (роль не admin) на /admin/* ручки.",
       "type": "timeseries",
-      "datasource": { "type": "victoriametrics-metrics-datasource", "uid": "vm-metrics" },
-      "gridPos": { "h": 6, "w": 8, "x": 16, "y": 76 },
+      "datasource": {
+        "type": "victoriametrics-metrics-datasource",
+        "uid": "vm-metrics"
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 8,
+        "x": 16,
+        "y": 95
+      },
       "targets": [
-        { "expr": "sum(rate(backend_admin_denied_total[1m]))", "legendFormat": "admin denied" }
+        {
+          "expr": "sum(rate(backend_admin_denied_total[1m]))",
+          "legendFormat": "admin denied"
+        }
       ],
-      "fieldConfig": { "defaults": { "unit": "ops" }, "overrides": [] }
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops"
+        },
+        "overrides": []
+      }
     },
-
     {
       "id": 160,
       "title": "📦 Склад",
       "type": "row",
       "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 82 },
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 101
+      },
       "panels": []
     },
     {
@@ -425,44 +1168,96 @@
       "title": "Резервирование / возврат / восполнение (rate)",
       "description": "Движения остатков по причине: reserve (списание в checkout), unreserve (возврат при неудачной оплате), restock (админка).",
       "type": "timeseries",
-      "datasource": { "type": "victoriametrics-metrics-datasource", "uid": "vm-metrics" },
-      "gridPos": { "h": 6, "w": 8, "x": 0, "y": 83 },
+      "datasource": {
+        "type": "victoriametrics-metrics-datasource",
+        "uid": "vm-metrics"
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 8,
+        "x": 0,
+        "y": 102
+      },
       "targets": [
-        { "expr": "sum(rate(backend_stock_movement_total[1m])) by (reason)", "legendFormat": "{{reason}}" }
+        {
+          "expr": "sum(rate(backend_stock_movement_total[1m])) by (reason)",
+          "legendFormat": "{{reason}}"
+        }
       ],
-      "fieldConfig": { "defaults": { "unit": "ops" }, "overrides": [] }
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops"
+        },
+        "overrides": []
+      }
     },
     {
       "id": 162,
       "title": "Заказы, заблокированные складом (rate)",
       "description": "Попытки купить товар с нехваткой остатков (409, заказ не создаётся).",
       "type": "timeseries",
-      "datasource": { "type": "victoriametrics-metrics-datasource", "uid": "vm-metrics" },
-      "gridPos": { "h": 6, "w": 8, "x": 8, "y": 83 },
+      "datasource": {
+        "type": "victoriametrics-metrics-datasource",
+        "uid": "vm-metrics"
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 8,
+        "x": 8,
+        "y": 102
+      },
       "targets": [
-        { "expr": "sum(rate(backend_orders_blocked_by_stock_total[1m]))", "legendFormat": "blocked" }
+        {
+          "expr": "sum(rate(backend_orders_blocked_by_stock_total[1m]))",
+          "legendFormat": "blocked"
+        }
       ],
-      "fieldConfig": { "defaults": { "unit": "ops" }, "overrides": [] }
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops"
+        },
+        "overrides": []
+      }
     },
     {
       "id": 163,
       "title": "Товаров без остатка",
       "description": "Gauge числа товаров с нулевым остатком (обновляется при чтении /admin/stock).",
       "type": "stat",
-      "datasource": { "type": "victoriametrics-metrics-datasource", "uid": "vm-metrics" },
-      "gridPos": { "h": 6, "w": 8, "x": 16, "y": 83 },
+      "datasource": {
+        "type": "victoriametrics-metrics-datasource",
+        "uid": "vm-metrics"
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 8,
+        "x": 16,
+        "y": 102
+      },
       "targets": [
-        { "expr": "backend_low_stock_products", "legendFormat": "low stock" }
+        {
+          "expr": "backend_low_stock_products",
+          "legendFormat": "low stock"
+        }
       ],
-      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] }
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      }
     },
-
     {
       "id": 170,
       "title": "⭐ Отзывы",
       "type": "row",
       "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 89 },
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 108
+      },
       "panels": []
     },
     {
@@ -470,25 +1265,60 @@
       "title": "Опубликовано / отклонено (rate)",
       "description": "ReviewPosted — успех; ReviewRejected — рейтинг вне 1..5 или пустой комментарий.",
       "type": "timeseries",
-      "datasource": { "type": "victoriametrics-metrics-datasource", "uid": "vm-metrics" },
-      "gridPos": { "h": 6, "w": 12, "x": 0, "y": 90 },
+      "datasource": {
+        "type": "victoriametrics-metrics-datasource",
+        "uid": "vm-metrics"
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 12,
+        "x": 0,
+        "y": 109
+      },
       "targets": [
-        { "expr": "sum(rate(backend_reviews_posted_total[1m]))", "legendFormat": "posted" },
-        { "expr": "sum(rate(backend_reviews_rejected_total[1m]))", "legendFormat": "rejected" }
+        {
+          "expr": "sum(rate(backend_reviews_posted_total[1m]))",
+          "legendFormat": "posted"
+        },
+        {
+          "expr": "sum(rate(backend_reviews_rejected_total[1m]))",
+          "legendFormat": "rejected"
+        }
       ],
-      "fieldConfig": { "defaults": { "unit": "ops" }, "overrides": [] }
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops"
+        },
+        "overrides": []
+      }
     },
     {
       "id": 172,
       "title": "Отзывы по оценке (rate)",
       "description": "Гистограмма распределения оценок 1..5.",
       "type": "timeseries",
-      "datasource": { "type": "victoriametrics-metrics-datasource", "uid": "vm-metrics" },
-      "gridPos": { "h": 6, "w": 12, "x": 12, "y": 90 },
+      "datasource": {
+        "type": "victoriametrics-metrics-datasource",
+        "uid": "vm-metrics"
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 12,
+        "x": 12,
+        "y": 109
+      },
       "targets": [
-        { "expr": "sum(rate(backend_reviews_by_rating_total[1m])) by (rating)", "legendFormat": "{{rating}}" }
+        {
+          "expr": "sum(rate(backend_reviews_by_rating_total[1m])) by (rating)",
+          "legendFormat": "{{rating}}"
+        }
       ],
-      "fieldConfig": { "defaults": { "unit": "ops" }, "overrides": [] }
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops"
+        },
+        "overrides": []
+      }
     }
   ]
 }

@@ -1,0 +1,337 @@
+{
+  "title": "SRE Lab — Observability Pillars (logs · traces)",
+  "uid": "sre-lab-pillars",
+  "schemaVersion": 39,
+  "version": 2,
+  "editable": true,
+  "timezone": "browser",
+  "time": {
+    "from": "now-30m",
+    "to": "now"
+  },
+  "refresh": "10s",
+  "tags": [
+    "sre-lab",
+    "observability"
+  ],
+  "panels": [
+    {
+      "id": 1000,
+      "title": "🩺 Service overview (metrics)",
+      "description": "Быстрый верхний срез по метрикам (VictoriaMetrics). Подробный RED/CB-дашборд смотри в red-and-circuit-breaker.json. Здесь фокус на том, какой сервис доступен и насколько он занят.",
+      "type": "row",
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "panels": []
+    },
+    {
+      "id": 1001,
+      "title": "UP / target (по сервисам)",
+      "type": "stat",
+      "datasource": { "type": "victoriametrics-metrics-datasource", "uid": "vm-metrics" },
+      "gridPos": { "h": 5, "w": 6, "x": 0, "y": 1 },
+      "targets": [
+        {
+          "expr": "up",
+          "legendFormat": "{{job}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "green", "value": 1 }
+            ]
+          },
+          "mappings": [
+            { "type": "value", "options": { "0": { "text": "DOWN" } } },
+            { "type": "value", "options": { "1": { "text": "UP" } } }
+          ]
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "horizontal",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "textMode": "value_and_name"
+      }
+    },
+    {
+      "id": 1002,
+      "title": "HTTP Rate (req/s по сервису)",
+      "type": "timeseries",
+      "datasource": { "type": "victoriametrics-metrics-datasource", "uid": "vm-metrics" },
+      "gridPos": { "h": 5, "w": 6, "x": 6, "y": 1 },
+      "targets": [
+        {
+          "expr": "sum(rate(backend_http_requests_total[1m])) by (route)",
+          "legendFormat": "backend {{route}}"
+        },
+        {
+          "expr": "sum(rate(recommendations_http_requests_total[1m]))",
+          "legendFormat": "recommendations"
+        },
+        {
+          "expr": "sum(rate(payment_http_requests_total[1m]))",
+          "legendFormat": "payment"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "reqps" },
+        "overrides": []
+      }
+    },
+    {
+      "id": 1003,
+      "title": "HTTP error rate (не-2xx / сек)",
+      "type": "timeseries",
+      "datasource": { "type": "victoriametrics-metrics-datasource", "uid": "vm-metrics" },
+      "gridPos": { "h": 5, "w": 6, "x": 12, "y": 1 },
+      "targets": [
+        {
+          "expr": "sum(rate(backend_http_requests_total{status!~\"2.*\"}[1m])) by (status)",
+          "legendFormat": "backend {{status}}"
+        },
+        {
+          "expr": "sum(rate(recommendations_http_requests_total{status!~\"2.*\"}[1m])) by (status)",
+          "legendFormat": "recs {{status}}"
+        },
+        {
+          "expr": "sum(rate(payment_http_requests_total{status!~\"2.*\"}[1m])) by (status)",
+          "legendFormat": "payment {{status}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "reqps" },
+        "overrides": []
+      }
+    },
+    {
+      "id": 1004,
+      "title": "Latency p95 (по сервису)",
+      "description": "Сравни с трейсами ниже: если p95 растёт, но rate не падает — ты увидишь длинные цепочки спанов в Tempo и связанные логи в VictoriaLogs.",
+      "type": "timeseries",
+      "datasource": { "type": "victoriametrics-metrics-datasource", "uid": "vm-metrics" },
+      "gridPos": { "h": 5, "w": 6, "x": 18, "y": 1 },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(backend_http_request_duration_seconds_bucket[5m])) by (le))",
+          "legendFormat": "backend p95"
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(recommendations_http_request_duration_seconds_bucket[5m])) by (le))",
+          "legendFormat": "recommendations p95"
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(payment_http_request_duration_seconds_bucket[5m])) by (le))",
+          "legendFormat": "payment p95"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "s" },
+        "overrides": []
+      }
+    },
+    {
+      "id": 1100,
+      "title": "📜 Logs (VictoriaLogs)",
+      "description": "Логи всех контейнеров собраны Vector'ом и хранятся в VictoriaLogs. Поле stream = 'service,container'. Дублировать красные полосы метрик тут можно через фильтры уровня. Клик по спану в трейсе ниже откроет эти логи по trace_id.",
+      "type": "row",
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 6 },
+      "panels": []
+    },
+    {
+      "id": 1101,
+      "title": "Log volume (строк по сервисам)",
+      "type": "timeseries",
+      "description": "Гистограмма объёма логов во времени, разбитая по сервисам. Считается через LogsQL-агрегацию VictoriaLogs (queryType statsRange).",
+      "datasource": { "type": "victoriametrics-logs-datasource", "uid": "vm-logs" },
+      "gridPos": { "h": 7, "w": 12, "x": 0, "y": 7 },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "* | stats by (service) count()",
+          "queryType": "statsRange",
+          "start": "",
+          "end": "",
+          "step": "1m"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 60,
+            "lineWidth": 1,
+            "showPoints": "never",
+            "stacking": {
+              "mode": "normal",
+              "group": "A"
+            }
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 1102,
+      "title": "Volume ошибок/предупреждений (ERROR/WARN)",
+      "type": "timeseries",
+      "description": "Гистограмма объёма ошибочных логов во времени, разбитая по уровню. Фильтр тот же, что и в панели ниже. ERROR → красный, WARN → жёлтый/оранжевый.",
+      "datasource": { "type": "victoriametrics-logs-datasource", "uid": "vm-logs" },
+      "gridPos": { "h": 7, "w": 12, "x": 12, "y": 7 },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "level:ERROR OR level:WARN OR level:CRITICAL OR level:PANIC | stats by (level) count()",
+          "queryType": "statsRange",
+          "start": "",
+          "end": "",
+          "step": "1m"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 60,
+            "lineWidth": 1,
+            "showPoints": "never",
+            "stacking": {
+              "mode": "normal",
+              "group": "A"
+            }
+          }
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "count(*){level=\"ERROR\"}" },
+            "properties": [
+              { "id": "displayName", "value": "ERROR" },
+              { "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "count(*){level=\"WARN\"}" },
+            "properties": [
+              { "id": "displayName", "value": "WARN" },
+              { "id": "color", "value": { "fixedColor": "orange", "mode": "fixed" } }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "count(*){level=\"CRITICAL\"}" },
+            "properties": [
+              { "id": "displayName", "value": "CRITICAL" },
+              { "id": "color", "value": { "fixedColor": "dark-red", "mode": "fixed" } }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "count(*){level=\"PANIC\"}" },
+            "properties": [
+              { "id": "displayName", "value": "PANIC" },
+              { "id": "color", "value": { "fixedColor": "dark-red", "mode": "fixed" } }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": 1103,
+      "title": "All logs (последние строки, все сервисы)",
+      "type": "logs",
+      "datasource": { "type": "victoriametrics-logs-datasource", "uid": "vm-logs" },
+      "gridPos": { "h": 10, "w": 12, "x": 0, "y": 14 },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "*",
+          "queryType": "Logs",
+          "start": "",
+          "end": "",
+          "step": ""
+        }
+      ],
+      "options": {
+        "showTime": true,
+        "showLabels": true,
+        "sortOrder": "Descending",
+        "enableLogDetails": true,
+        "dedupStrategy": "none"
+      }
+    },
+    {
+      "id": 1104,
+      "title": "Errors & warnings в логах (ERROR/WARN)",
+      "type": "logs",
+      "description": "Все access-логи HTTP-ошибок (level=ERROR, status >= 400) и сообщения о корневой причине от сервисов (degraded, chaos_injected_failure, checkout_failed, low_stock...) на уровне WARN. Настроено в коде: http_request логируется ERROR при status >= 400, иначе INFO.",
+      "datasource": { "type": "victoriametrics-logs-datasource", "uid": "vm-logs" },
+      "gridPos": { "h": 10, "w": 12, "x": 12, "y": 14 },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "level:ERROR OR level:WARN OR level:CRITICAL OR level:PANIC",
+          "queryType": "Logs",
+          "start": "",
+          "end": "",
+          "step": ""
+        }
+      ],
+      "options": {
+        "showTime": true,
+        "showLabels": true,
+        "sortOrder": "Descending",
+        "enableLogDetails": true,
+        "dedupStrategy": "none"
+      }
+    },
+    {
+      "id": 1200,
+      "title": "🔗 Traces (Tempo)",
+      "description": "Спаны из backend/recommendations/payment шлются по OTLP в Tempo. Service graph ниже показывает зависимости и ошибки между сервисами. Клик по узлу/ребру откроет связанные метрики (VictoriaMetrics), а клик по спаму — связанные логи (VictoriaLogs) по trace_id.",
+      "type": "row",
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 24 },
+      "panels": []
+    },
+    {
+      "id": 1201,
+      "title": "Service graph (зависимости между сервисами)",
+      "type": "nodeGraph",
+      "datasource": { "type": "tempo", "uid": "tempo" },
+      "gridPos": { "h": 16, "w": 24, "x": 0, "y": 25 },
+      "targets": [
+        {
+          "refId": "A",
+          "queryType": "serviceMap"
+        }
+      ],
+      "options": {
+        "nodes": {
+          "mainStatUnit": "short"
+        },
+        "edges": {
+          "stat": "traceDuration"
+        }
+      }
+    },
+    {
+      "id": 1202,
+      "title": "Как пользоваться этим дашбордом",
+      "type": "text",
+      "gridPos": { "h": 6, "w": 24, "x": 0, "y": 41 },
+      "options": {
+        "mode": "markdown",
+        "content": "### Связываем метрики, логи и трейсы\n\n1. **Метрика → трейс**: увидишь рост `Latency p95` или `error rate` на панели сверху → открой **Explore → Tempo**, выбери сервис и время — найдёшь конкретные спаны.\n2. **Трейс → лог**: в открытом трейсе кликни по спаму `backend` → Grafana откроет **VictoriaLogs** с фильтром `trace_id:\"<id>\"` (настроено в datasource Tempo через *tracesToLogs*).\n3. **Лог → трейс**: в логе backend есть `trace_id` — из него можно провалиться обратно в трейс в Tempo.\n4. **Панель Log volume по сервисам** и **Volume ошибок/предупреждений** — это столбчатые графики числа строк во времени (LogsQL-агрегация VictoriaLogs): HTTP-ошибки пишутся на уровне `ERROR`, а причины (`recommendations degraded`, `chaos_injected_failure`, `checkout_failed`) — на `WARN`. При CB OPEN / падении зависимости объём резко растёт — корневую причину видно в тексте панели **Errors & warnings**, а не только в графике метрик.",
+        "editorMode": "code"
+      }
+    }
+  ]
+}

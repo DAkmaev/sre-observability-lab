@@ -209,10 +209,15 @@ func main() {
 	bizMetrics := obs.NewBusinessMetrics()
 	tracer := otel.Tracer(serviceName)
 
-	// In-memory сессии. Каждое изменение числа активных сессий обновляет
-	// gauge активных сессий. При рестарте backend сессии сбрасываются,
-	// а users/отзывы/склад остаются в БД.
-	sessions := obs.SessionStore(func(n int) { bizMetrics.SetActiveSessions(n) })
+	// In-memory аутентификационные сессии (токен → user). При рестарте
+	// backend сессии сбрасываются, а users/отзывы/склад остаются в БД.
+	sessions := obs.SessionStore(nil)
+
+	// Активные сессии считаются по активности посетителя, а не по входу:
+	// каждый клиент получает анонимный cookie, и пока он присылает запросы,
+	// его сессия живёт (TTL 10с). Именно этот gauge отображается на панели
+	// «Активные сессии».
+	visitors := obs.VisitorStore(func(n int) { bizMetrics.SetActiveSessions(n) })
 
 	// Динамические настройки механизмов отказоустойчивости:
 	// retry, timeout, bulkhead, fallback. Меняются на лету через
@@ -222,6 +227,12 @@ func main() {
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+
+	// Janitor периодически вычищает протухшие in-memory сессии посетителей,
+	// чтобы gauge активных сессий падал, когда клиент больше не шлёт запросы.
+	visitors.StartJanitor(ctx)
+	// Auth-сессии тоже не должны накапливаться без очистки (TTL 15м).
+	sessions.StartJanitor(ctx)
 
 	shutdownTracing, err := obs.InitTracing(ctx, serviceName, otlpEndpoint)
 	if err != nil {
@@ -842,7 +853,11 @@ func main() {
 
 	handler := otelhttp.NewHandler(
 		obs.WithRequestID(
-			obs.InstrumentServer(metrics, logger, obs.UserContext(sessions)(mux)),
+			obs.InstrumentServer(metrics, logger,
+				obs.TrackVisitors(visitors)(
+					obs.UserContext(sessions)(mux),
+				),
+			),
 		),
 		serviceName+"-server",
 		otelhttp.WithFilter(func(r *http.Request) bool {

@@ -88,7 +88,7 @@ export default function AdminPage({ currentUser }) {
   async function doRestock(productId) {
     setStockBusy(true);
     try {
-      const qty = Number(restockQty[productId]) || 0;
+      const qty = Number(restockQty[productId] ?? 1) || 0;
       if (qty <= 0) {
         setStockMessage("Укажите положительное количество для restock.");
         setStockBusy(false);

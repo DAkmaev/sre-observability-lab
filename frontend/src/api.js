@@ -86,7 +86,7 @@ function exportRootSpan(context, path, method, status, error) {
             traceId: context.traceId,
             spanId: context.spanId,
             name: `${method} ${path}`,
-            kind: 2, // CLIENT
+            kind: 3, // SPAN_KIND_CLIENT: браузер — клиент, вызывающий backend
             startTimeUnixNano: context.startTime.toString(),
             endTimeUnixNano: (BigInt(Date.now()) * 1_000_000n).toString(),
             attributes,

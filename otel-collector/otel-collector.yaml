@@ -1,0 +1,47 @@
+# OTel Collector — точка приёма трейсов от приложений.
+# 1) Экспортирует трейсы дальше в Tempo (по OTLP/gRPC).
+# 2) servicegraph-коннектор генерирует метрики зависимостей
+#    (traces_service_graph_request_total{client,server}, *_failed_total,
+#    *_seconds) и пишет их remote-write в VictoriaMetrics.
+# Именно эти метрики рисует панель "Service graph" в Grafana
+# (nodeGraph, datasource tempo, queryType serviceMap -> vm-metrics).
+
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+
+processors:
+  batch:
+
+connectors:
+  service_graph:
+    # Лейблы client/server берутся из resource service.name. Дефолтные
+    # метрики (traces_service_graph_request_total и др.) совпадают с тем,
+    # что ожидает Grafana serviceMap.
+    # virtual_node_peer_attributes: [] отключает виртуальные узлы — в этом
+    # стенде все сервисы инструментированы, поэтому не парные client-спаны
+    # (например, без peer-атрибута) не должны рисовать лишний узел "unknown".
+    virtual_node_peer_attributes: []
+
+exporters:
+  otlp/tempo:
+    endpoint: tempo:4317
+    tls:
+      insecure: true
+  prometheusremotewrite:
+    endpoint: http://victoriametrics:8428/api/v1/write
+
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [otlp/tempo, service_graph]
+    metrics:
+      receivers: [service_graph]
+      processors: [batch]
+      exporters: [prometheusremotewrite]
